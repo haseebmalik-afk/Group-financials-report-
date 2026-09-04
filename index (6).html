@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITCAN Group · Finance Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#F5F6F8; --card:#FFFFFF; --ink:#1A2230; --muted:#6A7382; --faint:#A6AEBC;
+  --line:#E6E9EF; --line2:#EEF0F4;
+  --brand:#FA5523; --brand-mid:#F5915F; --brand-lt:#FBC4AF; --brand-wash:#FFF1EC;
+  --blue:#2563EB; --blue-mid:#7CA6F5; --blue-lt:#C9DBFB; --blue-wash:#EFF4FE;
+  --grey-bar:#C3CAD6;
+  --green:#12805A; --green-lt:#E4F6ED; --red:#C43B1E; --red-lt:#FDE7E0;
+  --side-bg:#1E2530; --side-line:#2A3240; --side-txt:#B8C0CC; --side-foot:#6A7383;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:.85rem;line-height:1.45}
+.tnum{font-variant-numeric:tabular-nums}
+.app{display:flex;min-height:100vh}
+
+/* ---------- Sidebar ---------- */
+.side{width:198px;min-width:198px;background:var(--side-bg);border-right:1px solid var(--side-line);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:18px 12px 14px}
+.logo{display:flex;align-items:center;gap:10px;padding:2px 8px 16px;border-bottom:1px solid var(--side-line);margin-bottom:14px}
+.logo .tile{width:34px;height:34px;border-radius:9px;background:var(--brand);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:.95rem;letter-spacing:-.02em}
+.logo .nm{color:#fff;font-weight:700;font-size:.92rem;letter-spacing:-.01em}
+.logo .sub{color:var(--side-foot);font-size:.66rem;font-weight:600;margin-top:1px}
+.ngroup{color:var(--side-foot);font-size:.62rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:12px 10px 5px}
+.nav a{display:flex;align-items:center;gap:8px;color:var(--side-txt);text-decoration:none;font-size:.8rem;font-weight:500;padding:7px 10px;border-radius:8px;margin:1px 0;transition:background .15s}
+.nav a:hover{background:rgba(255,255,255,.06)}
+.nav a.on{background:var(--brand);color:#fff;font-weight:600}
+.nav a .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.55;flex:none}
+.sfoot{margin-top:auto;padding:12px 10px 0;border-top:1px solid var(--side-line);color:var(--side-foot);font-size:.65rem;line-height:1.5}
+.sfoot b{color:var(--side-txt);font-weight:600}
+#lastfetch{color:var(--side-txt)}
+
+/* ---------- Content ---------- */
+.main{flex:1;max-width:1300px;padding:22px 30px 60px}
+.page{display:none}
+.page.on{display:block}
+h1{font-size:1.5rem;font-weight:700;letter-spacing:-.02em}
+.psub{color:var(--muted);font-size:.82rem;margin:3px 0 18px}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px}
+.card.p0{padding:0}
+.card.p0 .chd{padding:16px 18px 0}
+.col12{grid-column:span 12}.col8{grid-column:span 8}.col6{grid-column:span 6}.col4{grid-column:span 4}.col3{grid-column:span 3}
+.eyebrow{font-size:.72rem;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+.ctitle{font-size:1.05rem;font-weight:600;letter-spacing:-.01em;margin-top:2px}
+.csub{font-size:.76rem;color:var(--muted);margin-top:2px}
+.big{font-size:2rem;font-weight:700;letter-spacing:-.02em;margin-top:6px}
+.big.sm{font-size:1.45rem}
+.pos{color:var(--green)}.neg{color:var(--red)}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:999px}
+.chip.g{background:var(--green-lt);color:var(--green)}
+.chip.r{background:var(--red-lt);color:var(--red)}
+.chip.n{background:var(--line2);color:var(--muted)}
+.chip.b{background:var(--blue-wash);color:var(--blue)}
+.chip.o{background:var(--brand-wash);color:var(--brand)}
+.ktiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;padding:8px 18px 14px;font-size:.72rem;color:var(--muted);font-weight:500}
+.legend span{display:flex;align-items:center;gap:6px}
+.sw{width:11px;height:11px;border-radius:3px;display:inline-block}
+.chartbox{position:relative;padding:8px 12px 12px;height:300px}
+.chartbox.tall{height:340px}.chartbox.short{height:220px}
+canvas{max-width:100%}
+
+/* ---------- Tables ---------- */
+.twrap{overflow-x:auto;border-radius:0 0 13px 13px}
+table{border-collapse:collapse;width:100%;font-size:.78rem}
+th,td{padding:7px 11px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line2)}
+th{font-size:.68rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;position:sticky;top:0;background:var(--card);z-index:2}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--card);z-index:1;max-width:230px;overflow:hidden;text-overflow:ellipsis}
+th:first-child{z-index:3}
+tr:hover td{background:var(--brand-wash)}
+tr:hover td:first-child{background:var(--brand-wash)}
+tr.band td{background:var(--ink);color:#fff;font-weight:600;border-bottom:none}
+tr.band td:first-child{background:var(--ink)}
+tr.band:hover td{background:var(--ink)}
+tr.subtot td{font-weight:600;background:var(--line2)}
+tr.subtot td:first-child{background:var(--line2)}
+tr.muted td{color:var(--faint)}
+td.act{color:var(--ink)} td.fct{color:var(--muted)}
+th.mo-a{color:var(--brand)} th.mo-f{color:var(--blue)}
+th.mo-a-c{color:var(--blue)} th.mo-f-c{color:#8b93a3}
+.indent td:first-child{padding-left:26px;color:var(--muted)}
+
+/* ---------- misc ---------- */
+.spark{height:34px;margin-top:8px}
+.hrow{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.statline{display:flex;justify-content:space-between;font-size:.78rem;padding:6px 0;border-bottom:1px solid var(--line2)}
+.statline:last-child{border-bottom:none}
+.statline .l{color:var(--muted)}
+.statline .v{font-weight:600}
+.note{font-size:.76rem;color:var(--muted);background:var(--line2);border-radius:9px;padding:10px 13px;margin-top:12px;line-height:1.5}
+.err{background:var(--red-lt);color:var(--red);border-radius:9px;padding:10px 13px;font-size:.78rem;margin-bottom:14px;display:none}
+.load{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:99}
+.load .ring{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load p{color:var(--muted);font-size:.82rem}
+.hstat{border-left:3px solid var(--line);padding-left:12px}
+.hstat.ok{border-color:var(--green)} .hstat.bad{border-color:var(--red)}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:.72rem;word-break:break-all;color:var(--muted)}
+.method p{margin:8px 0;color:var(--ink)}
+.method h3{font-size:.92rem;margin:16px 0 4px}
+.method code{background:var(--line2);border-radius:5px;padding:1px 6px;font-size:.76rem}
+
+@media (max-width:1080px){.col8,.col6,.col4,.col3{grid-column:span 12}}
+@media (max-width:900px){
+  .app{flex-direction:column}
+  .side{width:100%;min-width:0;height:auto;position:static;flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px;padding:10px 12px}
+  .logo{border-bottom:none;padding:0 10px 0 0;margin:0}
+  .ngroup{display:none}
+  .nav{display:flex;flex-wrap:wrap}
+  .sfoot{display:none}
+  .main{padding:16px 14px 50px}
+}
+@media (prefers-reduced-motion:reduce){.load .ring{animation:none}}
+</style>
+</head>
+<body>
+
+<div class="load" id="loader"><div class="ring"></div><p id="loadmsg">Fetching live data from Google Sheets…</p></div>
+
+<div class="app">
+  <aside class="side">
+    <div class="logo">
+      <div class="tile">IT</div>
+      <div><div class="nm">ITCAN Group</div><div class="sub">Finance · 2026 Live</div></div>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="ngroup">Overview</div>
+      <a href="#pnl-cockpit" class="on"><span class="dot"></span>P&amp;L Cockpit</a>
+      <a href="#cash-cockpit"><span class="dot"></span>Cashflow Cockpit</a>
+      <div class="ngroup">Profit &amp; Loss</div>
+      <a href="#pnl-moontech"><span class="dot"></span>Moontech P&amp;L</a>
+      <a href="#pnl-cpx"><span class="dot"></span>ITCAN · CPX/MARS P&amp;L</a>
+      <div class="ngroup">Cashflow</div>
+      <a href="#cash-moontech"><span class="dot"></span>Moontech Cash</a>
+      <a href="#cash-cpx"><span class="dot"></span>ITCAN · CPX Cash</a>
+      <a href="#vc"><span class="dot"></span>VC Investment</a>
+      <div class="ngroup">Reference</div>
+      <a href="#health"><span class="dot"></span>Data &amp; Method</a>
+    </nav>
+    <div class="sfoot">Live from Google Sheets<br>Actuals through <b id="laLabel">July 2026</b><br>Fetched <span id="lastfetch">—</span></div>
+  </aside>
+
+  <main class="main">
+    <div class="err" id="errbar"></div>
+    <section class="page on" id="pg-pnl-cockpit"></section>
+    <section class="page" id="pg-cash-cockpit"></section>
+    <section class="page" id="pg-pnl-moontech"></section>
+    <section class="page" id="pg-pnl-cpx"></section>
+    <section class="page" id="pg-cash-moontech"></section>
+    <section class="page" id="pg-cash-cpx"></section>
+    <section class="page" id="pg-vc"></section>
+    <section class="page" id="pg-health"></section>
+  </main>
+</div>
+
+<script>
+/* ================================================================
+   CONFIG — the only block you touch month to month
+   ================================================================ */
+const CONFIG = {
+  // 0-based month index of the LAST month with real actuals (6 = July).
+  // Flip this each month after the sheets are updated.
+  LAST_ACTUAL: { pnl: 6, cash: 6 },
+
+  PNL_BASE:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQfPFBUeCjHeO4nNYzCjakS9WH5PfBrM5N136EiwKKynrG38wbaT-2ReAvO6UuIA8Ue2CdkmJNtXmvl/pub",
+  CASH_BASE: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_g4Q_5DS_AIsNAtS7RZ0esPY-ntwHLpm1rJ1m1zY8tMcYrXFmb2xj_UaY1ov88Yc235VHdUSHLozg/pub",
+
+  TABS: {
+    pnl_group:   { base:"pnl",  gid:"2082897314", label:"P&L · Live (Group) 23M" },
+    pnl_cpx:     { base:"pnl",  gid:"312525118",  label:"P&L · Live (ITCAN+CPX/MARS)" },
+    pnl_moon:    { base:"pnl",  gid:"1487839714", label:"P&L · Live Moontech" },
+    pnl_rva:     { base:"pnl",  gid:"116096348",  label:"P&L · Realistic VS Actual" },
+    cf_invest:   { base:"cash", gid:"1232387704", label:"Cashflow · Investment Summary", plain:true },
+    cf_group:    { base:"cash", gid:"1922464043", label:"Cashflow · (Group) Live" },
+    cf_moon:     { base:"cash", gid:"888714563",  label:"Cashflow · Moontech Live" },
+    cf_cpx:      { base:"cash", gid:"1796161324", label:"Cashflow · (ITCAN+CPX) Live" },
+    cf_var:      { base:"cash", gid:"956136770",  label:"Cashflow · Variance" }
+  },
+  FY_TARGET: 23000000
+};
+
+/* ================================================================
+   ENGINE — CSV + tab parsing (verified against real exports)
+   ================================================================ */
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MONTHS_S = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function parseCSV(text){
+  const rows=[]; let row=[], cur="", inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else inQ=false; } else cur+=c; }
+    else{
+      if(c==='"') inQ=true;
+      else if(c===','){ row.push(cur); cur=""; }
+      else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=""; }
+      else if(c==='\r'){}
+      else cur+=c;
+    }
+  }
+  if(cur.length||row.length){ row.push(cur); rows.push(row); }
+  return rows;
+}
+function num(s){
+  if(s==null) return null;
+  s=String(s).trim();
+  if(s===""||s==="-") return null;
+  let neg=false;
+  if(/^\(.*\)$/.test(s)){neg=true;s=s.slice(1,-1);}
+  s=s.replace(/[$,\s%]/g,"").replace(/AED/gi,"");
+  if(s===""||s==="-") return null;
+  const v=parseFloat(s);
+  if(isNaN(v)) return null;
+  return neg?-v:v;
+}
+function isPctRow(cells){
+  let p=0,n=0;
+  cells.forEach(c=>{c=String(c).trim(); if(c){n++; if(c.endsWith("%"))p++;}});
+  return n>0 && p/n>0.6;
+}
+function findMonthHeader(rows){
+  for(let r=0;r<Math.min(rows.length,15);r++){
+    const cols={};
+    (rows[r]||[]).forEach((c,i)=>{
+      const t=String(c).trim().toLowerCase();
+      const mi=MONTHS.findIndex(m=>m.toLowerCase()===t);
+      if(mi>=0) cols[i]=mi;
+    });
+    if(Object.keys(cols).length>=6) return {rowIdx:r, cols};
+  }
+  return null;
+}
+function parseFinTab(rows){
+  const hdr=findMonthHeader(rows);
+  if(!hdr) return {error:"No month header row found", rows:[], layout:"?"};
+  const monthCols=hdr.cols;
+  const colIdxs=Object.keys(monthCols).map(Number).sort((a,b)=>a-b);
+  let paired=false;
+  const sub=rows[hdr.rowIdx+1]||[];
+  const subVals=sub.map(c=>String(c).trim().toLowerCase());
+  if(subVals.includes("forecast")&&subVals.includes("actual")) paired=true;
+  const dataStart=hdr.rowIdx+(paired?2:1);
+  const out=[];
+  for(let r=dataStart;r<rows.length;r++){
+    const cells=rows[r]||[];
+    const label=String(cells[0]||"").trim();
+    if(!label) continue;
+    const pct=isPctRow(cells.slice(1));
+    const f=new Array(12).fill(null), a=new Array(12).fill(null);
+    colIdxs.forEach(ci=>{
+      const mi=monthCols[ci];
+      if(paired){ f[mi]=num(cells[ci]); a[mi]=num(cells[ci+1]); }
+      else{ f[mi]=num(cells[ci]); }
+    });
+    out.push({label, f, a, pct, rowIdx:r});
+  }
+  const norm=s=>s.toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  return {
+    layout:paired?"paired":"single",
+    rows:out, hdrRow:hdr.rowIdx,
+    find(label, after){ const t=norm(label); const start=after?out.indexOf(after)+1:0;
+      for(let i=start;i<out.length;i++) if(norm(out[i].label)===t) return out[i]; return null; },
+    findContains(frag, after){ const t=norm(frag); const start=after?out.indexOf(after)+1:0;
+      for(let i=start;i<out.length;i++) if(norm(out[i].label).includes(t)) return out[i]; return null; },
+    findAny(frags, after){ for(const fr of frags){ const r=this.findContains(fr, after); if(r) return r; } return null; },
+    between(a,b){ const i=out.indexOf(a), j=out.indexOf(b); if(i<0||j<0||j<=i) return []; return out.slice(i+1,j); }
+  };
+}
+function seriesVal(row, lastActualIdx, tab){
+  const actual=new Array(12).fill(null), forecast=new Array(12).fill(null), display=new Array(12).fill(null);
+  for(let m=0;m<12;m++){
+    if(tab.layout==="paired"){
+      const f=row.f[m], a=row.a[m];
+      forecast[m]=f;
+      if(m<=lastActualIdx){ actual[m]=a; display[m]=a; } else { display[m]=f; }
+    }else{
+      const v=row.f[m];
+      display[m]=v;
+      if(m<=lastActualIdx) actual[m]=v; else forecast[m]=v;
+    }
+  }
+  return {actual,forecast,display};
+}
+function sum(arr,from=0,to=11){let s=0,any=false;for(let i=from;i<=to;i++){if(arr[i]!=null){s+=arr[i];any=true;}}return any?s:null;}
+
+/* ================================================================
+   FORMATTERS
+   ================================================================ */
+function money(v,cur){ if(v==null||isNaN(v)) return "—";
+  const s=(cur||"AED")+" "+Math.round(Math.abs(v)).toLocaleString("en-US");
+  return v<0?"-"+s:s; }
+function moneyPlain(v){ if(v==null||isNaN(v)) return "—";
+  const s=Math.round(Math.abs(v)).toLocaleString("en-US"); return v<0?"("+s+")":s; }
+function fK(v){ if(v==null||isNaN(v)) return "—";
+  const a=Math.abs(v), sg=v<0?"-":"";
+  if(a>=1e6) return sg+(a/1e6).toFixed(1)+"M";
+  if(a>=1e3) return sg+(a/1e3).toFixed(0)+"K";
+  return sg+Math.round(a); }
+function pct(v,d=0){ return (v==null||isNaN(v))?"—":(v*100).toFixed(d)+"%"; }
+function signCls(v){ return v==null?"":(v<0?"neg":"pos"); }
+function deltaChip(v, goodUp=true, fmt=fK){
+  if(v==null||isNaN(v)) return '<span class="chip n">—</span>';
+  const good = goodUp ? v>=0 : v<=0;
+  const arrow = v>=0?"▲":"▼";
+  return `<span class="chip ${good?'g':'r'}">${arrow} ${fmt(Math.abs(v))}</span>`;
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+/* ================================================================
+   FETCH LAYER
+   ================================================================ */
+const STATE = { tabs:{}, health:{}, charts:[] };
+function tabURL(key){
+  const t=CONFIG.TABS[key];
+  const base=t.base==="pnl"?CONFIG.PNL_BASE:CONFIG.CASH_BASE;
+  return `${base}?gid=${t.gid}&single=true&output=csv`;
+}
+async function fetchTab(key){
+  const url=tabURL(key);
+  const h={key,label:CONFIG.TABS[key].label,url,ok:false,rows:0,layout:"—",anchors:[],missing:[],err:null};
+  try{
+    const res=await fetch(url,{redirect:"follow"});
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const text=await res.text();
+    if(/<html/i.test(text.slice(0,300))) throw new Error("Got an HTML page, not CSV — is 'Publish to web → Entire document' enabled?");
+    const grid=parseCSV(text);
+    h.raw=grid;
+    if(CONFIG.TABS[key].plain){
+      h.ok=grid.length>1; h.rows=grid.length; h.layout="table";
+      STATE.tabs[key]=null;
+    }else{
+      const tab=parseFinTab(grid);
+      h.ok=!tab.error; h.rows=tab.rows.length; h.layout=tab.layout; h.err=tab.error||null;
+      STATE.tabs[key]=tab;
+    }
+  }catch(e){ h.err=e.message; STATE.tabs[key]=null; }
+  STATE.health[key]=h;
+  return h;
+}
+
+/* ================================================================
+   ANCHOR EXTRACTION per tab type
+   ================================================================ */
+function pnlAnchors(tab, healthKey){
+  if(!tab||tab.error) return null;
+  const h=STATE.health[healthKey];
+  const A={};
+  A.sales   = tab.findAny(["sales","revenue","total revenue"]);
+  A.moonRev = tab.findAny(["moontech total"]);          // "MoonTech- Total" (revenue section, first hit)
+  A.cos     = tab.findAny(["cost of sales","cogs","cost of revenue"]);
+  A.cpxRev  = tab.findAny(["cpx mars total total","cpx mars total"]); // revenue section first hit
+  A.gp      = tab.findAny(["gross profit"]);
+  A.moonCost= A.cos ? tab.findAny(["moontech total"], A.cos) : null;
+  A.cpxCost = A.cos ? tab.findAny(["cpx mars total"], A.cos) : null;
+  A.expHdr  = A.gp ? tab.find("Expenses", A.gp) : tab.find("Expenses");
+  A.totExp  = tab.findAny(["total expenses","total opex"]);
+  A.net     = tab.findAny(["net earnings","net profit","net income","net result"]);
+  const req={sales:"Sales",cos:"Cost of Sales",gp:"Gross Profit",totExp:"Total Expenses",net:"Net Earnings"};
+  Object.entries(req).forEach(([k,lbl])=>{ if(A[k]) h.anchors.push(lbl); else h.missing.push(lbl); });
+  ["moonRev","cpxRev","moonCost","cpxCost"].forEach(k=>{ if(A[k]) h.anchors.push(k); });
+  return A;
+}
+function cashAnchors(tab, healthKey){
+  if(!tab||tab.error) return null;
+  const h=STATE.health[healthKey];
+  const A={};
+  A.opening = tab.findAny(["opening balance","opening cash","beginning balance","cash at beginning"]);
+  A.inflow  = tab.findAny(["total inflow","total inflows","total receipts","total collections","total cash in"]);
+  A.outflow = tab.findAny(["total outflow","total outflows","total payments","total cash out","total expenses"]);
+  A.net     = tab.findAny(["net cashflow","net cash flow","net movement","net cash","surplus deficit"]);
+  A.closing = tab.findAny(["closing balance","closing cash","ending balance","cash at end"]);
+  Object.entries({opening:"Opening balance",inflow:"Total inflows",outflow:"Total outflows",net:"Net cashflow",closing:"Closing balance"})
+    .forEach(([k,lbl])=>{ if(A[k]) h.anchors.push(lbl); else h.missing.push(lbl); });
+  return A;
+}
+
+/* ================================================================
+   CHART HELPERS
+   ================================================================ */
+function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+let TIP=null;
+function tip(){
+  if(TIP) return TIP;
+  TIP={backgroundColor:"#1A2230",titleColor:"#fff",bodyColor:"#D5DAE2",borderColor:"#2A3240",borderWidth:1,
+       padding:10,cornerRadius:6,titleFont:{weight:"600"},displayColors:true,boxPadding:4,
+       callbacks:{label:(c)=>` ${c.dataset.label!=null?c.dataset.label+": ":""}${moneyPlain(c.parsed.y!=null?c.parsed.y:c.parsed)}`}};
+  return TIP;
+}
+function baseOpts(extra){
+  return Object.assign({
+    responsive:true,maintainAspectRatio:false,
+    animation:matchMedia("(prefers-reduced-motion: reduce)").matches?false:{duration:500},
+    interaction:{intersect:false,mode:"index"},
+    plugins:{legend:{display:false},tooltip:tip()},
+    scales:{
+      x:{grid:{display:false},ticks:{color:cssVar("--muted")}},
+      y:{beginAtZero:true,grid:{color:cssVar("--line2")},border:{display:false},
+         ticks:{color:cssVar("--muted"),callback:v=>fK(v)}}
+    }
+  },extra||{});
+}
+function mkChart(id,cfg){
+  const el=document.getElementById(id);
+  if(!el) return;
+  const ch=new Chart(el.getContext("2d"),cfg);
+  STATE.charts.push(ch);
+  return ch;
+}
+/* per-month bar colors: actual vs forecast, by section palette */
+function moColors(lastActual, actualColor, fctColor){
+  return MONTHS_S.map((_,i)=> i<=lastActual?actualColor:fctColor);
+}
+function sparkline(id, data, color){
+  const el=document.getElementById(id); if(!el) return;
+  const ctx=el.getContext("2d");
+  const g=ctx.createLinearGradient(0,0,0,34);
+  g.addColorStop(0,color+"44"); g.addColorStop(1,color+"00");
+  mkChart(id,{type:"line",data:{labels:data.map((_,i)=>i),datasets:[{data,borderColor:color,backgroundColor:g,fill:true,borderWidth:1.6,pointRadius:0,tension:.35}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{enabled:false}},
+      scales:{x:{display:false},y:{display:false}}}});
+}
+
+/* ================================================================
+   PAGE RENDERERS
+   ================================================================ */
+function kpiTile(eyebrow, valueHTML, chipHTML, sparkId){
+  return `<div class="card"><div class="eyebrow">${eyebrow}</div>
+    <div class="big sm tnum">${valueHTML}</div>
+    <div style="margin-top:6px">${chipHTML||""}</div>
+    ${sparkId?`<div class="spark"><canvas id="${sparkId}"></canvas></div>`:""}</div>`;
+}
+function monthTh(pal){ // pal: 'pnl' (actual orange / fct blue) or 'cash' (actual blue / fct grey)
+  const la = pal==="pnl"?CONFIG.LAST_ACTUAL.pnl:CONFIG.LAST_ACTUAL.cash;
+  return MONTHS_S.map((m,i)=>{
+    const cls = pal==="pnl" ? (i<=la?"mo-a":"mo-f") : (i<=la?"mo-a-c":"mo-f-c");
+    return `<th class="${cls}">${m}</th>`;
+  }).join("");
+}
+function rowCells(vals, la, opts={}){
+  return vals.map((v,i)=>{
+    const cls=i<=la?"act":"fct";
+    const txt=opts.pct?pct(v!=null?v/100:null,0):moneyPlain(v);
+    const col=opts.signColor&&v!=null?(v<0?' style="color:var(--red)"':(opts.greenPos?' style="color:var(--green)"':"")):"";
+    return `<td class="tnum ${cls}"${col}>${txt}</td>`;
+  }).join("");
+}
+
+/* ---------- P&L COCKPIT ---------- */
+function renderPnlCockpit(){
+  const el=document.getElementById("pg-pnl-cockpit");
+  const la=CONFIG.LAST_ACTUAL.pnl;
+  const rva=STATE.tabs.pnl_rva, grp=STATE.tabs.pnl_group;
+  const A=STATE.A.rva;
+  if(!A){ el.innerHTML=`<h1>P&amp;L Cockpit</h1><div class="note">The "Realistic VS Actual" tab could not be parsed — see Data &amp; Method.</div>`; return; }
+
+  const sales=seriesVal(A.sales,la,rva), net=seriesVal(A.net,la,rva), gp=seriesVal(A.gp,la,rva),
+        totExp=seriesVal(A.totExp,la,rva),
+        moonRev=A.moonRev?seriesVal(A.moonRev,la,rva):null,
+        cpxRev=A.cpxRev?seriesVal(A.cpxRev,la,rva):null,
+        moonCost=A.moonCost?seriesVal(A.moonCost,la,rva):null,
+        cpxCost=A.cpxCost?seriesVal(A.cpxCost,la,rva):null;
+
+  const ytdRevA=sum(sales.actual,0,la), ytdRevF=sum(sales.forecast,0,la);
+  const ytdNetA=sum(net.actual,0,la), ytdNetF=sum(net.forecast,0,la);
+  const fyRevOutlook=sum(sales.display), fyNetOutlook=sum(net.display);
+  const fyNetPlan=sum(net.forecast);
+  const ytdGpm=ytdRevA?sum(gp.actual,0,la)/ytdRevA:null;
+  const ytdGpmF=ytdRevF?sum(gp.forecast,0,la)/ytdRevF:null;
+  // forecast accuracy YTD (revenue): 1 - mean(|A-F|/F)
+  let accN=0,accS=0, accNetN=0,accNetS=0;
+  for(let m=0;m<=la;m++){
+    if(sales.actual[m]!=null&&sales.forecast[m]){accS+=Math.abs(sales.actual[m]-sales.forecast[m])/Math.abs(sales.forecast[m]);accN++;}
+    if(net.actual[m]!=null&&net.forecast[m]){accNetS+=Math.abs(net.actual[m]-net.forecast[m])/Math.abs(net.forecast[m]);accNetN++;}
+  }
+  const revAcc=accN?1-accS/accN:null;
+  const runRate=ytdRevA!=null?ytdRevA/(la+1)*12:null;
+
+  const moonYtd=moonRev?sum(moonRev.actual,0,la):null, cpxYtd=cpxRev?sum(cpxRev.actual,0,la):null;
+  const moonGpmY=(moonRev&&moonCost&&moonYtd)?(moonYtd-sum(moonCost.actual,0,la))/moonYtd:null;
+  const cpxGpmY=(cpxRev&&cpxCost&&cpxYtd)?(cpxYtd-sum(cpxCost.actual,0,la))/cpxYtd:null;
+  const moonFy=moonRev?sum(moonRev.display):null, cpxFy=cpxRev?sum(cpxRev.display):null;
+  const moonPlanY=moonRev?sum(moonRev.forecast,0,la):null, cpxPlanY=cpxRev?sum(cpxRev.forecast,0,la):null;
+
+  el.innerHTML=`
+  <div class="hrow"><div><h1>P&amp;L Cockpit</h1>
+  <div class="psub">Group 2026 · live from the P&amp;L sheet · <span class="chip o">■ Actual — Jan–${MONTHS_S[la]}</span> <span class="chip b">■ Forecast — ${MONTHS_S[la+1]}–Dec</span></div></div></div>
+
+  <div class="grid">
+    <div class="card p0 col8">
+      <div class="chd"><div class="eyebrow">Group revenue · month by month</div>
+      <div class="ctitle">Plan vs delivered, AED</div>
+      <div class="csub">Light blue bars = the plan. Solid bars = what happened (orange) or the current forecast (blue). Grey dashed line = net earnings.</div></div>
+      <div class="chartbox tall"><canvas id="ch-hero"></canvas></div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--brand)"></span>Actual revenue</span>
+        <span><span class="sw" style="background:var(--blue)"></span>Forecast revenue</span>
+        <span><span class="sw" style="background:var(--blue-lt)"></span>Original plan</span>
+        <span><span class="sw" style="background:var(--faint)"></span>Net earnings</span>
+      </div>
+    </div>
+    <div class="card col4">
+      <div class="eyebrow">FY26 outlook · net earnings</div>
+      <div class="big tnum ${signCls(fyNetOutlook)}">${money(fyNetOutlook)}</div>
+      <div class="csub" style="margin-top:4px">Actuals Jan–${MONTHS_S[la]} + forecast ${MONTHS_S[la+1]}–Dec</div>
+      <div style="margin:14px 0 4px">
+        <div class="statline"><span class="l">Plan (full year)</span><span class="v tnum ${signCls(fyNetPlan)}">${money(fyNetPlan)}</span></div>
+        <div class="statline"><span class="l">Gap to plan</span><span class="v tnum">${deltaChip(fyNetOutlook-fyNetPlan,true)}</span></div>
+        <div class="statline"><span class="l">FY revenue outlook</span><span class="v tnum">${money(fyRevOutlook)}</span></div>
+        <div class="statline"><span class="l">Revenue target</span><span class="v tnum">${money(CONFIG.FY_TARGET)}</span></div>
+        <div class="statline"><span class="l">Gap to 23M</span><span class="v tnum">${deltaChip(fyRevOutlook-CONFIG.FY_TARGET,true)}</span></div>
+      </div>
+      <div class="note">The outlook uses booked actuals through ${MONTHS[la]} and the live forecast for the rest of the year.</div>
+    </div>
+
+    <div class="col12"><div class="ktiles">
+      ${kpiTile("YTD revenue (actual)", money(ytdRevA), deltaChip(ytdRevA-ytdRevF,true)+' <span class="chip n">vs plan</span>', "sp-rev")}
+      ${kpiTile("YTD net earnings", `<span class="${signCls(ytdNetA)}">${money(ytdNetA)}</span>`, deltaChip(ytdNetA-ytdNetF,true)+' <span class="chip n">vs plan</span>', "sp-net")}
+      ${kpiTile("YTD gross margin", pct(ytdGpm), `<span class="chip ${ytdGpm>=ytdGpmF?'g':'r'}">plan ${pct(ytdGpmF)}</span>`, "sp-gpm")}
+      ${kpiTile("Revenue run-rate (annualised)", money(runRate), `<span class="chip ${runRate>=CONFIG.FY_TARGET?'g':'r'}">target ${fK(CONFIG.FY_TARGET)}</span>`,"")}
+      ${kpiTile("Revenue forecast accuracy · YTD", pct(revAcc), '<span class="chip n">1 − avg |A−F| / F</span>',"")}
+      ${kpiTile("YTD opex (actual)", money(sum(totExp.actual,0,la)), deltaChip(sum(totExp.forecast,0,la)-sum(totExp.actual,0,la),true)+' <span class="chip n">vs plan</span>',"sp-opex")}
+    </div></div>
+
+    <div class="card col6">
+      <div class="eyebrow">Moontech · performance summary</div>
+      <div class="hrow"><div class="big sm tnum">${money(moonYtd)}</div><span class="chip o">YTD revenue</span></div>
+      <div style="margin-top:8px">
+        <div class="statline"><span class="l">vs plan YTD</span><span class="v">${deltaChip(moonYtd!=null&&moonPlanY!=null?moonYtd-moonPlanY:null,true)}</span></div>
+        <div class="statline"><span class="l">Gross margin YTD</span><span class="v tnum">${pct(moonGpmY)}</span></div>
+        <div class="statline"><span class="l">FY outlook</span><span class="v tnum">${money(moonFy)}</span></div>
+        <div class="statline"><span class="l">Share of group YTD</span><span class="v tnum">${pct(moonYtd&&ytdRevA?moonYtd/ytdRevA:null)}</span></div>
+      </div>
+      <div class="spark"><canvas id="sp-moon"></canvas></div>
+    </div>
+    <div class="card col6">
+      <div class="eyebrow">ITCAN · CPX/MARS · performance summary</div>
+      <div class="hrow"><div class="big sm tnum">${money(cpxYtd)}</div><span class="chip o">YTD revenue</span></div>
+      <div style="margin-top:8px">
+        <div class="statline"><span class="l">vs plan YTD</span><span class="v">${deltaChip(cpxYtd!=null&&cpxPlanY!=null?cpxYtd-cpxPlanY:null,true)}</span></div>
+        <div class="statline"><span class="l">Gross margin YTD</span><span class="v tnum">${pct(cpxGpmY)}</span></div>
+        <div class="statline"><span class="l">FY outlook</span><span class="v tnum">${money(cpxFy)}</span></div>
+        <div class="statline"><span class="l">Share of group YTD</span><span class="v tnum">${pct(cpxYtd&&ytdRevA?cpxYtd/ytdRevA:null)}</span></div>
+      </div>
+      <div class="spark"><canvas id="sp-cpx"></canvas></div>
+    </div>
+
+    <div class="card p0 col6">
+      <div class="chd"><div class="eyebrow">Entity mix</div><div class="ctitle">Revenue by entity · YTD actual</div></div>
+      <div class="chartbox short"><canvas id="ch-mix"></canvas></div>
+    </div>
+    <div class="card p0 col6">
+      <div class="chd"><div class="eyebrow">Cumulative net earnings</div><div class="ctitle">Live outlook vs plan</div></div>
+      <div class="chartbox short"><canvas id="ch-cumnet"></canvas></div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--brand)"></span>Live (actual + forecast)</span>
+        <span><span class="sw" style="background:var(--faint)"></span>Plan</span>
+      </div>
+    </div>
+
+    <div class="card p0 col12">
+      <div class="chd"><div class="eyebrow">Board table</div><div class="ctitle">Group · plan vs actual by month</div>
+      <div class="csub">Orange month headers are booked actuals; blue are forecast.</div></div>
+      <div class="twrap"><table id="tbl-cockpit"></table></div>
+    </div>
+  </div>`;
+
+  /* hero chart */
+  mkChart("ch-hero",{
+    type:"bar",
+    data:{labels:MONTHS_S,datasets:[
+      {label:"Plan",data:sales.forecast,backgroundColor:cssVar("--blue-lt"),borderRadius:4,order:3},
+      {label:"Revenue",data:sales.display,backgroundColor:moColors(la,cssVar("--brand"),cssVar("--blue")),borderRadius:4,order:2},
+      {label:"Net earnings",data:net.display,type:"line",borderColor:cssVar("--faint"),borderDash:[5,4],borderWidth:2,pointRadius:2.5,pointBackgroundColor:moColors(la,cssVar("--brand"),cssVar("--blue")),tension:.3,order:1}
+    ]},
+    options:baseOpts()
+  });
+  const cum=(arr)=>{let s=0;return arr.map(v=>s+=(v||0));};
+  mkChart("ch-cumnet",{type:"line",data:{labels:MONTHS_S,datasets:[
+    {label:"Live",data:cum(net.display),borderColor:cssVar("--brand"),backgroundColor:"transparent",borderWidth:2.2,pointRadius:0,tension:.25},
+    {label:"Plan",data:cum(net.forecast),borderColor:cssVar("--faint"),borderDash:[5,4],backgroundColor:"transparent",borderWidth:2,pointRadius:0,tension:.25}
+  ]},options:baseOpts({scales:{x:{grid:{display:false},ticks:{color:cssVar("--muted")}},y:{grid:{color:cssVar("--line2")},border:{display:false},ticks:{color:cssVar("--muted"),callback:v=>fK(v)}}}})});
+  if(moonYtd!=null&&cpxYtd!=null){
+    mkChart("ch-mix",{type:"doughnut",data:{labels:["Moontech","ITCAN · CPX/MARS"],datasets:[{data:[moonYtd,cpxYtd],backgroundColor:[cssVar("--brand"),cssVar("--ink")],borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:"58%",plugins:{legend:{position:"right",labels:{color:cssVar("--muted"),boxWidth:11,font:{family:"Inter"}}},tooltip:tip()}}});
+  }
+  sparkline("sp-rev",sales.actual.slice(0,la+1),cssVar(ytdRevA>=ytdRevF?"--green":"--red"));
+  sparkline("sp-net",net.actual.slice(0,la+1),cssVar(ytdNetA>=0?"--green":"--red"));
+  sparkline("sp-gpm",gp.actual.slice(0,la+1).map((g,i)=>g&&sales.actual[i]?g/sales.actual[i]:null),cssVar("--brand"));
+  sparkline("sp-opex",totExp.actual.slice(0,la+1),cssVar("--muted"));
+  if(moonRev) sparkline("sp-moon",moonRev.display,cssVar("--brand"));
+  if(cpxRev) sparkline("sp-cpx",cpxRev.display,cssVar("--ink"));
+
+  /* board table */
+  const t=document.getElementById("tbl-cockpit");
+  const rows=[
+    ["Revenue — plan",sales.forecast,{}],
+    ["Revenue — actual / live",sales.display,{}],
+    ["Revenue variance",sales.display.map((v,i)=>i<=la&&v!=null&&sales.forecast[i]!=null?v-sales.forecast[i]:null),{signColor:true,greenPos:true}],
+    ["Gross profit",gp.display,{signColor:true,greenPos:true}],
+    ["Total expenses",totExp.display,{}],
+    ["Net earnings — plan",net.forecast,{signColor:true,greenPos:true}],
+    ["Net earnings — actual / live",net.display,{signColor:true,greenPos:true}],
+    ["Net variance",net.display.map((v,i)=>i<=la&&v!=null&&net.forecast[i]!=null?v-net.forecast[i]:null),{signColor:true,greenPos:true}]
+  ];
+  t.innerHTML=`<thead><tr><th>AED</th>${monthTh("pnl")}<th>FY</th></tr></thead><tbody>`+
+    rows.map(([l,vals,o],ri)=>{
+      const fy=sum(vals);
+      const band=(l.startsWith("Net earnings — actual"))?' class="band"':'';
+      return `<tr${band}><td>${l}</td>${rowCells(vals,la,o)}<td class="tnum" ${o.signColor&&fy!=null&&fy<0?'style="color:var(--red)"':''}>${moneyPlain(fy)}</td></tr>`;
+    }).join("")+"</tbody>";
+}
+
+/* ---------- ENTITY P&L PAGE ---------- */
+function renderEntityPnl(pageId, tabKey, title, accent){
+  const el=document.getElementById(pageId);
+  const la=CONFIG.LAST_ACTUAL.pnl;
+  const tab=STATE.tabs[tabKey];
+  if(!tab||tab.error){ el.innerHTML=`<h1>${title}</h1><div class="note">This tab could not be fetched/parsed (${esc(STATE.health[tabKey]&&STATE.health[tabKey].err||"unknown")}). See Data &amp; Method.</div>`; return; }
+  const A=pnlAnchors(tab,tabKey);
+  const S=r=>r?seriesVal(r,la,tab):null;
+  const sales=S(A.sales), cos=S(A.cos), gp=S(A.gp), totExp=S(A.totExp), net=S(A.net);
+  const cid=pageId.replace(/[^a-z]/g,"");
+  const ytdRev=sales?sum(sales.display,0,la):null;
+  const ytdGp=gp?sum(gp.display,0,la):null;
+  const ytdNet=net?sum(net.display,0,la):null;
+  const fyRev=sales?sum(sales.display):null, fyNet=net?sum(net.display):null;
+  const gpm=ytdRev&&ytdGp!=null?ytdGp/ytdRev:null;
+
+  el.innerHTML=`
+  <div class="hrow"><div><h1>${title}</h1>
+  <div class="psub">Live tab · <span class="chip o">■ Actual — Jan–${MONTHS_S[la]}</span> <span class="chip b">■ Forecast — ${MONTHS_S[la+1]}–Dec</span></div></div></div>
+  <div class="grid">
+    <div class="col12"><div class="ktiles">
+      ${kpiTile("YTD revenue", money(ytdRev), "", "sp-"+cid+"r")}
+      ${kpiTile("YTD gross profit", `<span class="${signCls(ytdGp)}">${money(ytdGp)}</span>`, `<span class="chip n">margin ${pct(gpm)}</span>`,"")}
+      ${kpiTile("YTD net earnings", `<span class="${signCls(ytdNet)}">${money(ytdNet)}</span>`, "", "sp-"+cid+"n")}
+      ${kpiTile("FY26 revenue outlook", money(fyRev), "", "")}
+      ${kpiTile("FY26 net outlook", `<span class="${signCls(fyNet)}">${money(fyNet)}</span>`, "", "")}
+    </div></div>
+
+    <div class="card p0 col8">
+      <div class="chd"><div class="eyebrow">${title}</div><div class="ctitle">Revenue &amp; net earnings by month</div></div>
+      <div class="chartbox tall"><canvas id="ch-${cid}-rev"></canvas></div>
+      <div class="legend"><span><span class="sw" style="background:var(--brand)"></span>Actual</span>
+      <span><span class="sw" style="background:var(--blue)"></span>Forecast</span>
+      <span><span class="sw" style="background:var(--faint)"></span>Net earnings</span></div>
+    </div>
+    <div class="card p0 col4">
+      <div class="chd"><div class="eyebrow">Composition</div><div class="ctitle">Revenue vs cost vs opex</div></div>
+      <div class="chartbox tall"><canvas id="ch-${cid}-comp"></canvas></div>
+    </div>
+
+    <div class="card p0 col12">
+      <div class="chd"><div class="eyebrow">Full statement</div><div class="ctitle">${title} — line by line to net earnings</div>
+      <div class="csub">Every row live from the sheet. Orange headers = booked months, blue = forecast.</div></div>
+      <div class="twrap"><table id="tbl-${cid}"></table></div>
+    </div>
+  </div>`;
+
+  if(sales) mkChart(`ch-${cid}-rev`,{type:"bar",data:{labels:MONTHS_S,datasets:[
+      {label:"Revenue",data:sales.display,backgroundColor:moColors(la,cssVar("--brand"),cssVar("--blue")),borderRadius:4,order:2},
+      net?{label:"Net earnings",data:net.display,type:"line",borderColor:cssVar("--faint"),borderDash:[5,4],borderWidth:2,pointRadius:2.5,pointBackgroundColor:moColors(la,cssVar("--brand"),cssVar("--blue")),tension:.3,order:1}:null
+    ].filter(Boolean)},options:baseOpts()});
+  if(sales&&cos&&totExp) mkChart(`ch-${cid}-comp`,{type:"bar",data:{labels:MONTHS_S,datasets:[
+      {label:"Cost of sales",data:cos.display,backgroundColor:cssVar("--ink"),stack:"s",borderRadius:3},
+      {label:"Opex",data:totExp.display,backgroundColor:cssVar("--grey-bar"),stack:"s",borderRadius:3},
+      {label:"Revenue",data:sales.display,type:"line",borderColor:cssVar("--brand"),borderWidth:2,pointRadius:0,tension:.25}
+    ]},options:baseOpts({scales:{x:{stacked:true,grid:{display:false},ticks:{color:cssVar("--muted")}},y:{stacked:true,beginAtZero:true,grid:{color:cssVar("--line2")},border:{display:false},ticks:{color:cssVar("--muted"),callback:v=>fK(v)}}}})});
+  if(sales) sparkline("sp-"+cid+"r",sales.display,cssVar("--brand"));
+  if(net) sparkline("sp-"+cid+"n",net.display,cssVar(ytdNet>=0?"--green":"--red"));
+
+  /* full table: all rows to Net Earnings */
+  const t=document.getElementById(`tbl-${cid}`);
+  const netIdx=A.net?tab.rows.indexOf(A.net):tab.rows.length-1;
+  const shown=tab.rows.slice(0,netIdx+1);
+  const totals=new Set([A.sales,A.gp,A.totExp,A.moonRev,A.cpxRev,A.moonCost,A.cpxCost,A.cos].filter(Boolean));
+  t.innerHTML=`<thead><tr><th>AED</th>${monthTh("pnl")}<th>FY</th></tr></thead><tbody>`+
+    shown.map(r=>{
+      const s=seriesVal(r,la,tab);
+      const hasData=s.display.some(v=>v!=null);
+      const fy=sum(s.display);
+      const isNet=r===A.net;
+      const cls=isNet?' class="band"':(totals.has(r)?' class="subtot"':(!hasData?' class="muted"':''));
+      const signColor=isNet||r===A.gp;
+      return `<tr${cls}><td title="${esc(r.label)}">${esc(r.label)}</td>${
+        r.pct?rowCells(s.display,la,{pct:true}):rowCells(s.display,la,{signColor,greenPos:true})
+      }<td class="tnum">${r.pct?"—":moneyPlain(fy)}</td></tr>`;
+    }).join("")+"</tbody>";
+}
+
+/* ---------- CASHFLOW COCKPIT ---------- */
+function renderCashCockpit(){
+  const el=document.getElementById("pg-cash-cockpit");
+  const la=CONFIG.LAST_ACTUAL.cash;
+  const tab=STATE.tabs.cf_group;
+  const vtab=STATE.tabs.cf_var;
+  if(!tab||tab.error){ el.innerHTML=`<h1>Cashflow Cockpit</h1><div class="note">The Group cashflow tab could not be fetched/parsed (${esc(STATE.health.cf_group&&STATE.health.cf_group.err||"unknown")}). See Data &amp; Method for the fix.</div>`; return; }
+  const A=STATE.A.cfg;
+  const S=r=>r?seriesVal(r,la,tab):null;
+  const inflow=S(A.inflow), outflow=S(A.outflow), netc=S(A.net), closing=S(A.closing), opening=S(A.opening);
+
+  /* burn = avg monthly net cash movement over actual months where negative */
+  let burn=null;
+  if(netc){
+    const acts=netc.actual.filter(v=>v!=null);
+    if(acts.length) burn=-(acts.reduce((a,b)=>a+b,0)/acts.length);
+  }else if(inflow&&outflow){
+    let s=0,n=0; for(let m=0;m<=la;m++){ if(inflow.actual[m]!=null&&outflow.actual[m]!=null){s+=Math.abs(outflow.actual[m])-inflow.actual[m];n++;} }
+    if(n) burn=s/n;
+  }
+  const latestCash=closing?closing.actual[la]!=null?closing.actual[la]:closing.display[la]:null;
+  const runway=(burn!=null&&burn>0&&latestCash!=null)?latestCash/burn:null;
+  const ytdIn=inflow?sum(inflow.display,0,la):null, ytdOut=outflow?Math.abs(sum(outflow.display,0,la)):null;
+
+  /* forecast accuracy from variance tab if it parsed with paired layout */
+  let cfAcc=null;
+  const mA=STATE.A.moonCash, moonTab=STATE.tabs.cf_moon;
+  const cA=STATE.A.cpxCash, cpxTab=STATE.tabs.cf_cpx;
+  function entCard(name, EA, etab){
+    if(!EA||!etab||etab.error) return `<div class="card col6"><div class="eyebrow">${name} · cash summary</div><div class="note">Tab not parsed — see Data &amp; Method.</div></div>`;
+    const Sx=r=>r?seriesVal(r,la,etab):null;
+    const ci=Sx(EA.inflow), co=Sx(EA.outflow), cc=Sx(EA.closing), cn=Sx(EA.net);
+    const cash=cc?(cc.actual[la]!=null?cc.actual[la]:cc.display[la]):null;
+    return `<div class="card col6">
+      <div class="eyebrow">${name} · cash summary</div>
+      <div class="hrow"><div class="big sm tnum">${money(cash)}</div><span class="chip b">cash · end ${MONTHS_S[la]}</span></div>
+      <div style="margin-top:8px">
+        <div class="statline"><span class="l">Inflows YTD</span><span class="v tnum pos">${money(ci?sum(ci.display,0,la):null)}</span></div>
+        <div class="statline"><span class="l">Outflows YTD</span><span class="v tnum neg">${money(co?-Math.abs(sum(co.display,0,la)||0):null)}</span></div>
+        <div class="statline"><span class="l">Net YTD</span><span class="v tnum ${signCls(cn?sum(cn.display,0,la):null)}">${money(cn?sum(cn.display,0,la):null)}</span></div>
+      </div>
+      <div class="spark"><canvas id="sp-${name.replace(/[^a-z]/gi,"")}-c"></canvas></div>
+    </div>`;
+  }
+
+  el.innerHTML=`
+  <div class="hrow"><div><h1>Cashflow Cockpit</h1>
+  <div class="psub">Group 2026 · live from the cashflow sheet · <span class="chip b">■ Actual — Jan–${MONTHS_S[la]}</span> <span class="chip n">■ Forecast — ${MONTHS_S[la+1]}–Dec</span></div></div></div>
+  <div class="grid">
+    <div class="card p0 col8">
+      <div class="chd"><div class="eyebrow">Group cash · month by month</div><div class="ctitle">Inflows vs outflows, closing balance</div></div>
+      <div class="chartbox tall"><canvas id="ch-cash-hero"></canvas></div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--green)"></span>Inflows</span>
+        <span><span class="sw" style="background:var(--red)"></span>Outflows</span>
+        <span><span class="sw" style="background:var(--blue)"></span>Closing balance</span>
+      </div>
+    </div>
+    <div class="card col4">
+      <div class="eyebrow">Cash position · end ${MONTHS_S[la]}</div>
+      <div class="big tnum ${signCls(latestCash)}">${money(latestCash)}</div>
+      <div style="margin:14px 0 4px">
+        <div class="statline"><span class="l">Avg net cash / month (actuals)</span><span class="v tnum ${signCls(burn!=null?-burn:null)}">${burn!=null?money(-burn):"—"}</span></div>
+        <div class="statline"><span class="l">Runway at current burn</span><span class="v tnum">${runway!=null?runway.toFixed(1)+" months":(burn!=null&&burn<=0?"cash-positive":"—")}</span></div>
+        <div class="statline"><span class="l">Inflows YTD</span><span class="v tnum pos">${money(ytdIn)}</span></div>
+        <div class="statline"><span class="l">Outflows YTD</span><span class="v tnum neg">${money(ytdOut!=null?-ytdOut:null)}</span></div>
+      </div>
+      <div class="note">Avg net cash = mean monthly net movement over booked months; a negative value is the burn (Jan–${MONTHS_S[la]}). Runway = latest closing balance ÷ burn. Forecast months not included.</div>
+    </div>
+
+    ${entCard("Moontech", mA, moonTab)}
+    ${entCard("ITCAN · CPX", cA, cpxTab)}
+
+    <div class="card p0 col12">
+      <div class="chd"><div class="eyebrow">Group cashflow table</div><div class="ctitle">Line by line, live</div>
+      <div class="csub">Blue month headers = booked; grey = forecast.</div></div>
+      <div class="twrap"><table id="tbl-cash-grp"></table></div>
+    </div>
+  </div>`;
+
+  const ds=[];
+  if(inflow) ds.push({label:"Inflows",data:inflow.display,backgroundColor:MONTHS_S.map((_,i)=>i<=la?cssVar("--green"):"#9CCDB9"),borderRadius:4});
+  if(outflow) ds.push({label:"Outflows",data:outflow.display.map(v=>v==null?null:-Math.abs(v)),backgroundColor:MONTHS_S.map((_,i)=>i<=la?cssVar("--red"):"#E4A897"),borderRadius:4});
+  if(closing) ds.push({label:"Closing balance",data:closing.display,type:"line",borderColor:cssVar("--blue"),borderWidth:2.2,pointRadius:2.5,pointBackgroundColor:MONTHS_S.map((_,i)=>i<=la?cssVar("--blue"):cssVar("--grey-bar")),tension:.25});
+  if(ds.length) mkChart("ch-cash-hero",{type:"bar",data:{labels:MONTHS_S,datasets:ds},
+    options:baseOpts({scales:{x:{grid:{display:false},ticks:{color:cssVar("--muted")}},y:{grid:{color:cssVar("--line2")},border:{display:false},ticks:{color:cssVar("--muted"),callback:v=>fK(v)}}}})});
+  if(mA&&moonTab&&!moonTab.error){const s=seriesVal(mA.closing||mA.net||moonTab.rows[0],la,moonTab);sparkline("sp-Moontech-c",s.display,cssVar("--blue"));}
+  if(cA&&cpxTab&&!cpxTab.error){const s=seriesVal(cA.closing||cA.net||cpxTab.rows[0],la,cpxTab);sparkline("sp-ITCANCPX-c",s.display,cssVar("--ink"));}
+
+  renderCashTable("tbl-cash-grp",tab,A,la);
+}
+function renderCashTable(tid,tab,A,la){
+  const t=document.getElementById(tid); if(!t) return;
+  const totals=new Set([A&&A.inflow,A&&A.outflow,A&&A.opening].filter(Boolean));
+  const band=new Set([A&&A.net,A&&A.closing].filter(Boolean));
+  t.innerHTML=`<thead><tr><th>AED</th>${monthTh("cash")}<th>FY</th></tr></thead><tbody>`+
+    tab.rows.map(r=>{
+      const s=seriesVal(r,la,tab);
+      const hasData=s.display.some(v=>v!=null);
+      const cls=band.has(r)?' class="band"':(totals.has(r)?' class="subtot"':(!hasData?' class="muted"':''));
+      return `<tr${cls}><td title="${esc(r.label)}">${esc(r.label)}</td>${
+        r.pct?rowCells(s.display,la,{pct:true}):rowCells(s.display,la,{signColor:r===(A&&A.net),greenPos:true})
+      }<td class="tnum">${r.pct?"—":moneyPlain(sum(s.display))}</td></tr>`;
+    }).join("")+"</tbody>";
+}
+
+/* ---------- ENTITY CASH PAGE ---------- */
+function renderEntityCash(pageId, tabKey, anchorKey, title){
+  const el=document.getElementById(pageId);
+  const la=CONFIG.LAST_ACTUAL.cash;
+  const tab=STATE.tabs[tabKey];
+  if(!tab||tab.error){ el.innerHTML=`<h1>${title}</h1><div class="note">This tab could not be fetched/parsed (${esc(STATE.health[tabKey]&&STATE.health[tabKey].err||"unknown")}). See Data &amp; Method.</div>`; return; }
+  const A=STATE.A[anchorKey];
+  const S=r=>r?seriesVal(r,la,tab):null;
+  const inflow=S(A.inflow), outflow=S(A.outflow), netc=S(A.net), closing=S(A.closing);
+  const cid=pageId.replace(/[^a-z]/g,"");
+  const cash=closing?(closing.actual[la]!=null?closing.actual[la]:closing.display[la]):null;
+  el.innerHTML=`
+  <div class="hrow"><div><h1>${title}</h1>
+  <div class="psub">Live tab · <span class="chip b">■ Actual — Jan–${MONTHS_S[la]}</span> <span class="chip n">■ Forecast — ${MONTHS_S[la+1]}–Dec</span></div></div></div>
+  <div class="grid">
+    <div class="col12"><div class="ktiles">
+      ${kpiTile("Cash · end "+MONTHS_S[la], money(cash), "", "")}
+      ${kpiTile("Inflows YTD", `<span class="pos">${money(inflow?sum(inflow.display,0,la):null)}</span>`,"","")}
+      ${kpiTile("Outflows YTD", `<span class="neg">${money(outflow?-Math.abs(sum(outflow.display,0,la)||0):null)}</span>`,"","")}
+      ${kpiTile("Net YTD", `<span class="${signCls(netc?sum(netc.display,0,la):null)}">${money(netc?sum(netc.display,0,la):null)}</span>`,"","")}
+    </div></div>
+    <div class="card p0 col12">
+      <div class="chd"><div class="eyebrow">${title}</div><div class="ctitle">Inflows, outflows &amp; balance</div></div>
+      <div class="chartbox tall"><canvas id="ch-${cid}"></canvas></div>
+    </div>
+    <div class="card p0 col12">
+      <div class="chd"><div class="eyebrow">Full statement</div><div class="ctitle">${title} — line by line</div></div>
+      <div class="twrap"><table id="tbl-${cid}"></table></div>
+    </div>
+  </div>`;
+  const ds=[];
+  if(inflow) ds.push({label:"Inflows",data:inflow.display,backgroundColor:MONTHS_S.map((_,i)=>i<=la?cssVar("--green"):"#9CCDB9"),borderRadius:4});
+  if(outflow) ds.push({label:"Outflows",data:outflow.display.map(v=>v==null?null:-Math.abs(v)),backgroundColor:MONTHS_S.map((_,i)=>i<=la?cssVar("--red"):"#E4A897"),borderRadius:4});
+  if(closing) ds.push({label:"Closing balance",data:closing.display,type:"line",borderColor:cssVar("--blue"),borderWidth:2.2,pointRadius:2.5,tension:.25});
+  if(ds.length) mkChart("ch-"+cid,{type:"bar",data:{labels:MONTHS_S,datasets:ds},options:baseOpts()});
+  renderCashTable("tbl-"+cid,tab,A,la);
+}
+
+/* ---------- VC INVESTMENT ---------- */
+function parseUsage(usage, amount){
+  /* returns [{q:"Q4 2025", amt}] — parses strings like "Q4 2025", "30 K - Q2 , 20K Q3 - 2026", "50K Q3, 50K Q4 2026" */
+  if(!usage) return [];
+  const s=String(usage);
+  const parts=s.split(/,/);
+  const out=[];
+  let defaultYear=null;
+  const ym=s.match(/20\d\d/g); if(ym) defaultYear=ym[ym.length-1];
+  parts.forEach(p=>{
+    const qm=p.match(/Q\s*([1-4])/i); if(!qm) return;
+    const yq=p.match(/20\d\d/);
+    const am=p.match(/([\d.]+)\s*[Kk]/);
+    out.push({q:"Q"+qm[1]+" "+(yq?yq[0]:(defaultYear||"")), amt:am?parseFloat(am[1])*1000:null});
+  });
+  if(out.length===1&&out[0].amt==null) out[0].amt=amount;
+  if(out.length>1){
+    const known=out.reduce((a,o)=>a+(o.amt||0),0);
+    const un=out.filter(o=>o.amt==null);
+    if(un.length&&amount!=null) un.forEach(o=>o.amt=(amount-known)/un.length);
+  }
+  return out;
+}
+function renderVC(){
+  const el=document.getElementById("pg-vc");
+  const h=STATE.health.cf_invest;
+  const raw=h&&h.raw;
+  if(!raw){ el.innerHTML=`<h1>VC Investment</h1><div class="note">Investment Summary tab could not be fetched (${esc(h&&h.err||"unknown")}).</div>`; return; }
+  /* structure: header row with Investor Name / Indicative Amount / Status / Usage / Deployment Status */
+  let hdrIdx=-1;
+  raw.forEach((r,i)=>{ if(hdrIdx<0 && r.some(c=>/investor name/i.test(c))) hdrIdx=i; });
+  const investors=[];
+  if(hdrIdx>=0){
+    for(let i=hdrIdx+1;i<raw.length;i++){
+      const r=raw[i]; const name=String(r[0]||"").trim();
+      if(!name) continue;
+      if(/^total/i.test(name)){ break; }
+      investors.push({name, amount:num(r[1]), status:String(r[2]||"").trim(), usage:String(r[3]||"").trim(), deploy:num(r[4])});
+    }
+  }
+  const active=investors.filter(v=>!/cancel/i.test(v.status));
+  const cancelled=investors.filter(v=>/cancel/i.test(v.status));
+  const received=active.filter(v=>/transferred|received/i.test(v.status));
+  const totCommit=active.reduce((a,v)=>a+(v.amount||0),0);
+  const totReceived=received.reduce((a,v)=>a+(v.amount||0),0);
+  /* deployment by quarter */
+  const byQ={};
+  active.forEach(v=>parseUsage(v.usage,v.amount).forEach(u=>{ if(!u.q.trim())return; byQ[u.q]=byQ[u.q]||{total:0,who:[]}; byQ[u.q].total+=u.amt||0; if(u.amt) byQ[u.q].who.push(v.name.trim()+" "+fK(u.amt).replace("K","K")); }));
+  const qOrder=Object.keys(byQ).sort((a,b)=>{const pa=a.split(" "),pb=b.split(" ");return (pa[1]||"")===(pb[1]||"")?pa[0].localeCompare(pb[0]):(pa[1]||"").localeCompare(pb[1]||"");});
+  /* deployed vs pending: weight by Deployment Status % when present */
+  let deployed=0;
+  active.forEach(v=>{ if(v.deploy!=null&&v.amount!=null) deployed+=v.amount*(v.deploy/100); });
+  const knownDeploy=active.filter(v=>v.deploy!=null&&v.amount!=null).reduce((a,v)=>a+v.amount,0);
+  const pendingNext=active.flatMap(v=>{
+    const us=parseUsage(v.usage,v.amount);
+    const undone=(v.deploy==null||v.deploy<100);
+    return undone?us.filter(u=>/Q4 2026/.test(u.q)).map(u=>({name:v.name.trim(),amt:u.amt,q:u.q})):[];
+  });
+
+  el.innerHTML=`
+  <div class="hrow"><div><h1>VC Investment</h1><div class="psub">Investment Summary · live · figures in USD</div></div></div>
+  <div class="grid">
+    <div class="col12"><div class="ktiles">
+      ${kpiTile("Committed (active)", money(totCommit,"$"), cancelled.length?`<span class="chip n">${cancelled.length} cancelled excl.</span>`:"","")}
+      ${kpiTile("Funds received", money(totReceived,"$"), `<span class="chip g">${received.length} of ${active.length} investors</span>`,"")}
+      ${kpiTile("Deployed (weighted)", money(deployed,"$"), `<span class="chip n">of ${money(knownDeploy,"$").replace("$ ","$")} with % reported</span>`,"")}
+      ${kpiTile("Pending next Q (Q4 26)", money(pendingNext.reduce((a,p)=>a+(p.amt||0),0),"$"), pendingNext.length?`<span class="chip b">${pendingNext.map(p=>p.name).join(", ")}</span>`:'<span class="chip n">none flagged</span>',"")}
+    </div></div>
+
+    <div class="card p0 col7">
+      <div class="chd"><div class="eyebrow">Deployment plan</div><div class="ctitle">Capital by quarter of usage</div></div>
+      <div class="chartbox"><canvas id="ch-vcq"></canvas></div>
+    </div>
+    <div class="card p0 col5">
+      <div class="chd"><div class="eyebrow">Who invested</div><div class="ctitle">Ticket sizes</div></div>
+      <div class="chartbox"><canvas id="ch-vcw"></canvas></div>
+    </div>
+
+    <div class="card p0 col12">
+      <div class="chd"><div class="eyebrow">Register</div><div class="ctitle">Investor by investor</div></div>
+      <div class="twrap"><table id="tbl-vc"></table></div>
+    </div>
+  </div>`;
+
+  mkChart("ch-vcq",{type:"bar",data:{labels:qOrder,datasets:[{label:"Deployment",data:qOrder.map(q=>byQ[q].total),
+    backgroundColor:qOrder.map(q=>/2026/.test(q)&&/Q4/.test(q)?cssVar("--brand"):cssVar("--ink")),borderRadius:5}]},
+    options:baseOpts({plugins:{legend:{display:false},tooltip:Object.assign({},tip(),{callbacks:{label:c=>" $"+Math.round(c.parsed.y).toLocaleString(),afterLabel:c=>byQ[qOrder[c.dataIndex]].who.join("\n")}})}})});
+  const sorted=[...active].sort((a,b)=>(b.amount||0)-(a.amount||0));
+  mkChart("ch-vcw",{type:"bar",data:{labels:sorted.map(v=>v.name.trim()),datasets:[{data:sorted.map(v=>v.amount),backgroundColor:cssVar("--brand-mid"),borderRadius:5}]},
+    options:baseOpts({indexAxis:"y",scales:{x:{beginAtZero:true,grid:{color:cssVar("--line2")},border:{display:false},ticks:{color:cssVar("--muted"),callback:v=>"$"+fK(v)}},y:{grid:{display:false},ticks:{color:cssVar("--muted")}}}})});
+
+  const t=document.getElementById("tbl-vc");
+  t.innerHTML=`<thead><tr><th>Investor</th><th>Amount</th><th style="text-align:left">Status</th><th style="text-align:left">Usage</th><th>Deployed</th></tr></thead><tbody>`+
+    investors.map(v=>{
+      const st=/cancel/i.test(v.status)?'<span class="chip r">Cancelled</span>':(/transferred|received/i.test(v.status)?'<span class="chip g">Received</span>':`<span class="chip n">${esc(v.status||"—")}</span>`);
+      const dp=v.deploy==null?'<span class="chip n">—</span>':(v.deploy>=100?'<span class="chip g">100%</span>':`<span class="chip o">${v.deploy}%</span>`);
+      return `<tr${/cancel/i.test(v.status)?' class="muted"':''}><td>${esc(v.name)}</td><td class="tnum">${v.amount!=null?"$"+Math.round(v.amount).toLocaleString():"—"}</td><td style="text-align:left">${st}</td><td style="text-align:left">${esc(v.usage||"—")}</td><td>${dp}</td></tr>`;
+    }).join("")+`<tr class="band"><td>Total (active)</td><td class="tnum">$${Math.round(totCommit).toLocaleString()}</td><td></td><td></td><td></td></tr></tbody>`;
+}
+
+/* ---------- DATA & METHOD ---------- */
+function renderHealth(){
+  const el=document.getElementById("pg-health");
+  const cards=Object.values(STATE.health).map(h=>{
+    const ok=h.ok&&!h.err;
+    return `<div class="card col6 hstat ${ok?"ok":"bad"}">
+      <div class="hrow"><div class="ctitle" style="font-size:.92rem">${esc(h.label)}</div>
+      ${ok?'<span class="chip g">fetched</span>':'<span class="chip r">failed</span>'}</div>
+      <div class="statline"><span class="l">Rows parsed</span><span class="v tnum">${h.rows}</span></div>
+      <div class="statline"><span class="l">Layout</span><span class="v">${h.layout==="paired"?"Forecast + Actual pairs":h.layout==="single"?"One column per month":"—"}</span></div>
+      <div class="statline"><span class="l">Anchors found</span><span class="v" style="text-align:right">${h.anchors.length?h.anchors.join(", "):"—"}</span></div>
+      ${h.missing&&h.missing.length?`<div class="statline"><span class="l">Missing</span><span class="v" style="color:var(--red)">${h.missing.join(", ")}</span></div>`:""}
+      ${h.err?`<div class="note" style="background:var(--red-lt);color:var(--red)">${esc(h.err)}</div>`:""}
+      <div class="mono" style="margin-top:8px">${esc(h.url)}</div>
+    </div>`;
+  }).join("");
+  el.innerHTML=`
+  <h1>Data &amp; Method</h1>
+  <div class="psub">What was fetched, how every number is computed, and what to check when something looks off.</div>
+  <div class="grid">${cards}
+    <div class="card col12 method">
+      <div class="eyebrow">Method</div>
+      <h3>Data source &amp; refresh</h3>
+      <p>Every figure is fetched live from the published Google Sheets CSV endpoints on each page load — nothing is hardcoded. Updating the sheets updates the dashboard on the next refresh. If Google's "publish to web" cache lags, changes can take up to ~5 minutes to appear.</p>
+      <h3>Actual vs forecast</h3>
+      <p>Actuals run January–<b>${MONTHS[CONFIG.LAST_ACTUAL.pnl]}</b> (set once a month in <code>CONFIG.LAST_ACTUAL</code> at the top of this file — cell colours don't survive CSV export, so this one switch drives all actual/forecast colouring, on both P&amp;L and cashflow, including variance columns). On the "Realistic VS Actual" tab, months after the cutoff use the Forecast column; the placeholder "Actual" values the sheet carries for future months are ignored.</p>
+      <h3>Formulas</h3>
+      <p><code>YTD</code> = sum Jan→last actual month. <code>FY outlook</code> = actuals through cutoff + live forecast after. <code>Gross margin</code> = gross profit ÷ revenue (recomputed, not read from the GPM row). <code>Variance</code> = actual − plan, green when favourable. <code>Forecast accuracy</code> = 1 − average(|actual−forecast| ÷ |forecast|) over booked months. <code>Avg net cash</code> = mean monthly net cash movement over booked months (negative = burn). <code>Runway</code> = latest closing balance ÷ |burn|, only when net cash is negative. <code>Deployed (VC)</code> = ticket × reported deployment %.</p>
+      <h3>Verified</h3>
+      <p>The parser was reconciled against the exported "Realistic VS Actual" and "Investment Summary" tabs: Gross Profit = Sales − Cost of Sales, Net = GP − Total Expenses, Sales = Moontech + CPX/MARS, and the 15 expense parents sum to Total Expenses — all to within AED 1 rounding, every month, forecast and actual. Rows below Net Earnings (buffer etc.) are excluded by design.</p>
+    </div>
+  </div>`;
+}
+
+/* ================================================================
+   NAV + BOOT
+   ================================================================ */
+function initNav(){
+  const links=[...document.querySelectorAll(".nav a")];
+  function go(hash){
+    const id=(hash||"#pnl-cockpit").replace("#","");
+    document.querySelectorAll(".page").forEach(p=>p.classList.remove("on"));
+    const pg=document.getElementById("pg-"+id);
+    (pg||document.getElementById("pg-pnl-cockpit")).classList.add("on");
+    links.forEach(a=>a.classList.toggle("on",a.getAttribute("href")==="#"+id));
+    window.scrollTo({top:0});
+  }
+  links.forEach(a=>a.addEventListener("click",e=>{e.preventDefault();history.replaceState(null,"",a.getAttribute("href"));go(a.getAttribute("href"));}));
+  go(location.hash);
+}
+async function boot(){
+  if(typeof Chart!=="undefined"){
+    Chart.defaults.font.family="'Inter',system-ui,sans-serif";
+    Chart.defaults.color="#6A7382";
+  }
+  const keys=Object.keys(CONFIG.TABS);
+  document.getElementById("loadmsg").textContent="Fetching "+keys.length+" live tabs from Google Sheets…";
+  await Promise.all(keys.map(fetchTab));
+  /* anchors */
+  STATE.A={};
+  STATE.A.rva = STATE.tabs.pnl_rva ? pnlAnchors(STATE.tabs.pnl_rva,"pnl_rva") : null;
+  STATE.A.grp = STATE.tabs.pnl_group ? pnlAnchors(STATE.tabs.pnl_group,"pnl_group") : null;
+  STATE.A.cfg = STATE.tabs.cf_group ? cashAnchors(STATE.tabs.cf_group,"cf_group") : null;
+  STATE.A.moonCash = STATE.tabs.cf_moon ? cashAnchors(STATE.tabs.cf_moon,"cf_moon") : null;
+  STATE.A.cpxCash = STATE.tabs.cf_cpx ? cashAnchors(STATE.tabs.cf_cpx,"cf_cpx") : null;
+  if(STATE.tabs.cf_var) cashAnchors(STATE.tabs.cf_var,"cf_var");
+
+  document.getElementById("laLabel").textContent=MONTHS[CONFIG.LAST_ACTUAL.pnl]+" 2026";
+  document.getElementById("lastfetch").textContent=new Date().toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+
+  const fails=Object.values(STATE.health).filter(h=>!h.ok);
+  if(fails.length){
+    const eb=document.getElementById("errbar");
+    eb.style.display="block";
+    eb.innerHTML=`⚠ ${fails.length} of ${keys.length} tabs didn't load cleanly (${fails.map(f=>esc(f.label)).join("; ")}). Affected pages show what's missing — full detail on the <a href="#health" onclick="document.querySelector('.nav a[href=\\'#health\\']').click();return false;" style="color:inherit;font-weight:600">Data &amp; Method</a> page.`;
+  }
+
+  try{renderPnlCockpit();}catch(e){console.error("cockpit",e);}
+  try{renderEntityPnl("pg-pnl-moontech","pnl_moon","Moontech P&L");}catch(e){console.error("moon",e);}
+  try{renderEntityPnl("pg-pnl-cpx","pnl_cpx","ITCAN · CPX/MARS P&L");}catch(e){console.error("cpx",e);}
+  try{renderCashCockpit();}catch(e){console.error("cashc",e);}
+  try{renderEntityCash("pg-cash-moontech","cf_moon","moonCash","Moontech Cashflow");}catch(e){console.error("mcash",e);}
+  try{renderEntityCash("pg-cash-cpx","cf_cpx","cpxCash","ITCAN · CPX Cashflow");}catch(e){console.error("ccash",e);}
+  try{renderVC();}catch(e){console.error("vc",e);}
+  try{renderHealth();}catch(e){console.error("health",e);}
+
+  initNav();
+  document.getElementById("loader").style.display="none";
+}
+boot();
+</script>
+</body>
+</html>
