@@ -134,7 +134,7 @@ td.heat{font-weight:500}
 </style>
 </head>
 <body>
-<div class="load" id="loader"><div class="ring"></div><p id="loadmsg">Fetching live data from Google Sheets…</p></div>
+<div class="load" id="loader"><div class="ring"></div><p id="loadmsg">Loading…</p></div>
 <div class="app">
   <aside class="side">
     <div class="logo"><div class="tile">IT</div><div><div class="nm">ITCAN Group</div><div class="sub">Finance · 2026 Live</div></div></div>
@@ -431,7 +431,7 @@ function detectLastActual(grid){
 function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
 function tip(fmt){return{backgroundColor:"#1A2230",titleColor:"#fff",bodyColor:"#D5DAE2",borderColor:"#2A3240",borderWidth:1,padding:10,cornerRadius:6,titleFont:{weight:"600"},displayColors:true,boxPadding:4,
   callbacks:{label:c=>{const horiz=c.chart&&c.chart.options&&c.chart.options.indexAxis==="y";const v=horiz?c.parsed.x:c.parsed.y;return` ${c.dataset.label!=null?c.dataset.label+": ":""}${(fmt||moneyPlain)(v)}`;}}};}
-function hOpts(extra){const o={responsive:true,maintainAspectRatio:false,indexAxis:"y",animation:matchMedia("(prefers-reduced-motion: reduce)").matches?false:{duration:450},interaction:{intersect:false,mode:"index"},
+function hOpts(extra){const o={responsive:true,maintainAspectRatio:false,indexAxis:"y",animation:matchMedia("(prefers-reduced-motion: reduce)").matches?false:{duration:450},interaction:{intersect:false,mode:"index",axis:"y"},
   plugins:{legend:{display:true,position:"bottom",labels:{color:cssVar("--muted"),boxWidth:10,boxHeight:10,padding:14,font:{size:11}}},tooltip:tip()},
   scales:{x:{beginAtZero:true,grid:{color:cssVar("--line2")},border:{display:false},ticks:{color:cssVar("--muted"),callback:v=>fK(v)}},y:{grid:{display:false},ticks:{color:cssVar("--muted"),font:{size:11}}}}};return deepMerge(o,extra||{});}
 function baseOpts(extra){const o={responsive:true,maintainAspectRatio:false,animation:matchMedia("(prefers-reduced-motion: reduce)").matches?false:{duration:450},
@@ -649,20 +649,20 @@ function burnMetrics(A,la,W,base,ent){
   const FC=ent?forecastCash(ent):null;
   return{netBurn,grossBurn,avgIn,avgOpIn,avgOpOut,cash,opBurn,finInSum,repaySum,planNet,planOut,trend,cover,
     cashOut:FC?FC.cashOut:null,cashOutLabel:FC?FC.cashOutLabel:null,monthsLeft:FC?FC.monthsLeft:null,yearEnd:FC?FC.yearEnd:null};}
-function burnTiles(B,W,la,scope){
+function finLabel(ent){return ent==="moon"?"VC":(ent==="cpx"?"loans":"VC & loans");}
+function burnTiles(B,W,la,scope,ent){const FL=finLabel(ent);
   const opPos=B.opBurn!=null&&B.opBurn>=0;
   const status=B.opBurn==null?"—":(opPos?`<span class="pos">Cash-positive</span>`:`<span class="neg">Burning</span>`);
   const statusChip=B.opBurn==null?"":(opPos?`<span class="chip g">operating +${fK(B.opBurn)} / month</span>`:`<span class="chip r">operating −${fK(-B.opBurn)} / month</span>`);
   const rwVal=B.cashOut!=null?`${B.monthsLeft} mo`:(B.yearEnd!=null?"Beyond Dec":"—");
   const rwChip=B.cashOut!=null?`<span class="chip ${B.monthsLeft<=3?'r':(B.monthsLeft<=6?'o':'g')}">cash runs out ${B.cashOutLabel}</span>`:(B.yearEnd!=null?`<span class="chip g">year-end cash ${fK(B.yearEnd)} on the forecast</span>`:'<span class="chip n">no forecast months in the sheet</span>');
-  return`<div class="card col12" style="padding:14px 18px"><div class="hrow"><div><div class="eyebrow">Burn · ${scope}</div><div class="ctitle" style="font-size:.95rem">Operating basis · booked months in ${W.label}</div></div><span class="chip n">financing in period: +${fK(B.finInSum)} raised · −${fK(B.repaySum)} repaid</span></div>
+  return`<div class="card col12" style="padding:14px 18px"><div class="hrow"><div><div class="eyebrow">Burn · ${scope}</div><div class="ctitle" style="font-size:.95rem">Operating basis · booked months in ${W.label}</div></div><span class="chip n">${ent==="moon"?`VC injected in period: +${fK(B.finInSum)}`:(ent==="cpx"?`loans in period: +${fK(B.finInSum)} drawn · −${fK(B.repaySum)} repaid`:`financing in period: +${fK(B.finInSum)} VC & loans · −${fK(B.repaySum)} repaid`)}</span></div>
     <div class="ktiles" style="margin-top:12px">
-      ${kpiTile("Operating burn / month",`<span class="${signCls(B.opBurn)}">${money(B.opBurn)}</span>`,B.netBurn!=null?`<span class="chip n">incl. financing ${B.netBurn>=0?"+":"−"}${fK(Math.abs(B.netBurn))} / month</span>`:"","","",'Average monthly net cash movement with financing stripped out: VC and loan inflows removed, loan repayments added back. The rate at which the business itself consumes cash. The grey chip is the same figure with financing included.')}
+      ${kpiTile("Operating burn / month",`<span class="${signCls(B.opBurn)}">${money(B.opBurn)}</span>`,B.netBurn!=null?`<span class="chip n">incl. ${FL}${ent==="cpx"?", net of repayments":""} ${B.netBurn>=0?"+":"−"}${fK(Math.abs(B.netBurn))} / month</span>`:"","","",`Average monthly net cash movement with ${FL}${ent!=="moon"?" and loan repayments":""} stripped out. The rate at which the business itself consumes cash. The grey chip is the same figure with ${FL} included.`)}
       ${kpiTile("Gross burn / month",`<span class="neg">${money(B.avgOpOut!=null?-B.avgOpOut:null)}</span>`,B.planOut!=null?costChip(B.avgOpOut,B.planOut):"","","",'Average monthly operating outflows (total outflows less loan repayments) over the booked months shown, before any inflows. The raw spend rate.')}
       ${kpiTile("Inflow coverage of outflows",pct(B.cover),`<span class="chip ${B.cover>=1?'g':'r'}">${B.cover>=1?"self-funding":"drawing down cash"}</span>`,"","",'Average monthly operating inflows ÷ average monthly operating outflows — financing excluded on both sides. Above 100% the business funds itself; below, it draws on the cash balance.')}
       ${kpiTile("Current status",status,statusChip,"",B.cash!=null?`cash ${fK(B.cash)} at end ${MONTHS_S[W.toA]}`:"",'Judged on operating burn: Cash-positive when the business covers its own outflows without financing; Burning when it does not.')}
       ${kpiTile("Runway",rwVal,rwChip,"","Finance forecast",'From the cashflow forecast maintained in the sheet — the month the forecast closing balance first goes below zero, and the months from the last booked month until then. This reflects known commitments (tax, loan instalments, planned spend) rather than a trailing average, so it stresses the scenario rather than flattering it.')}
-      ${kpiTile("Burn trend · last 3 vs prior 3",B.trend==null?"—":`<span class="${signCls(B.trend)}">${money(B.trend)}</span>`,B.trend==null?'<span class="chip n">needs 6 booked months</span>':`<span class="chip ${B.trend>=0?'g':'r'}">${B.trend>=0?"improving":"worsening"}</span>`,"","",'Average net cash movement of the last three booked months minus the three before. Positive = burn easing.')}
     </div></div>`;}
 
 /* ================================================================
@@ -699,7 +699,7 @@ function renderCashCockpit(){
       ${kpiTile(`Collections forecast accuracy · ${W.label}`,pct(accIn),`<span class="chip n">${A.collections?esc(A.collections.label):"collections row not found"}</span>`,"","",'Client collections only (the operating-inflow row) vs the locked plan. Financing inflows — VC, loans — are excluded so they don\'t flatter or distort the score.')}
       ${kpiTile(`Outflow forecast accuracy · ${W.label}`,pct(accOut),'<span class="chip n">total outflows vs plan</span>',"","",'1 − average(|actual − plan| ÷ plan) on total outflows over booked months in the period.')}
     </div></div>
-    ${burnTiles(burnMetrics(A,la,W,R,"group"),W,la,"Group")}
+    ${burnTiles(burnMetrics(A,la,W,R,"group"),W,la,"Group","group")}
     ${cashEntityCard("Moontech","moon",la)}${cashEntityCard("ITCAN · CPX","cpx",la)}
   </div>`;
   const ds=[];
@@ -746,7 +746,7 @@ function renderEntityCash(pageId,ent,title){
       ${kpiTile(`Outflows ${W.label}`,`<span class="neg">${money(outflow?-Math.abs(sum(outflow.actual,W.from,W.toA)||0):null)}</span>`,costChip(outflow?Math.abs(sum(outflow.actual,W.from,W.toA)||0):null,sum(LOCKED.cash[bases[0].k][ent].outflow,W.from,W.toA)),"")}
       ${kpiTile(`Net ${W.label}`,`<span class="${signCls(netc?sum(netc.actual,W.from,W.toA):null)}">${money(netc?sum(netc.actual,W.from,W.toA):null)}</span>`,deltaChip(netc?sum(netc.actual,W.from,W.toA)-sum(LOCKED.cash[bases[0].k][ent].net,W.from,W.toA):null,true)+` <span class="chip n">vs ${bases[0].label.replace(" (locked)","")}</span>`,"")}
     </div></div>
-    ${burnTiles(burnMetrics(A,la,W,ent==="moon"?LOCKED.cash.noFunding.moon:LOCKED.cash.realistic[ent],ent),W,la,title)}
+    ${burnTiles(burnMetrics(A,la,W,ent==="moon"?LOCKED.cash.noFunding.moon:LOCKED.cash.realistic[ent],ent),W,la,title,ent)}
     ${ent==="moon"?hybridStrip(la,inflow,outflow,closing):""}
     <div class="card p0 col12"><div class="chd"><div class="eyebrow">${title}</div><div class="ctitle">Inflows, outflows &amp; balance — live inside the no-funding ↔ acceleration corridor</div></div><div class="chartbox tall"><canvas id="ch-${cid}"></canvas></div></div>
   </div>`;
@@ -847,7 +847,9 @@ function readInvestors(){
   const investors=[];if(hdrIdx>=0){for(let i=hdrIdx+1;i<raw.length;i++){const r=raw[i];const name=String(r[0]||"").trim();if(!name)continue;if(/^total/i.test(name))break;
     investors.push({name,amount:num(r[1]),status:String(r[2]||"").trim(),usage:String(r[3]||"").trim(),deploy:num(r[4])});}}
   investors.forEach(v=>{v.cancelled=/cancel/i.test(v.status);v.received=/transferred|received/i.test(v.status);v.alloc=parseUsage(v.usage,v.amount);});
+  let sheetTotal=null;raw.forEach(r=>{if(/^total/i.test(String(r[0]||"").trim())&&num(r[1])!=null)sheetTotal=num(r[1]);});investors.sheetTotal=sheetTotal;
   return investors;}
+function vcCash2026(){const A=STATE.A.cf_group;if(!A||!A.vcLines||!A.vcLines.length)return null;const la=CONFIG.LAST_ACTUAL.cash;return sum(A.vcLines.map(r=>sum(r.f,0,la)||0));}
 function qStrip(v){
   /* deployment status walks quarters in order: earlier quarters are done first */
   let remainingDeployed=(v.deploy!=null&&v.amount!=null)?v.amount*(v.deploy/100):null;
@@ -862,13 +864,13 @@ function renderVC(){
   let deployed=0,knownDeploy=0;active.forEach(v=>{if(v.deploy!=null&&v.amount!=null){deployed+=v.amount*(v.deploy/100);knownDeploy+=v.amount;}});
   const byQ={};QUARTERS.forEach(q=>byQ[q]={});active.forEach(v=>v.alloc.forEach(a=>{if(byQ[a.q])byQ[a.q][v.name]=(byQ[a.q][v.name]||0)+(a.amt||0);}));
   const pending=[];active.forEach(v=>{let rem=(v.deploy!=null&&v.amount!=null)?v.amount*(v.deploy/100):null;v.alloc.forEach(a=>{if(!a.amt)return;if(rem!=null){if(rem>=a.amt-1){rem-=a.amt;return;}const left=a.amt-Math.max(rem,0);rem=0;if(a.q===CONFIG.NEXT_Q)pending.push({name:v.name,amt:left});}else if(a.q===CONFIG.NEXT_Q)pending.push({name:v.name,amt:a.amt});});});
-  const pendingTot=pending.reduce((a,p)=>a+p.amt,0);const totAED=totReceived*CONFIG.USD_AED;
+  const pendingTot=pending.reduce((a,p)=>a+p.amt,0);const headline=investors.sheetTotal!=null?investors.sheetTotal:totReceived;const totAED=headline*CONFIG.USD_AED;const dep2026=vcCash2026();
   const palette=[cssVar("--brand"),cssVar("--ink"),cssVar("--blue"),cssVar("--target"),cssVar("--teal"),cssVar("--brand-mid"),cssVar("--blue-mid"),cssVar("--grey-bar"),"#B08968"];
   el.innerHTML=`
   <div class="hrow"><div><h1>VC Investment</h1><div class="psub">Investment Summary · live · USD (AED at ${CONFIG.USD_AED} peg)</div></div></div>
   <div class="grid">
     <div class="col12"><div class="ktiles">
-      ${kpiTile("Total VC raised (received)",money(totReceived,"$"),`<span class="chip g">${received.length} of ${active.length} active investors</span>`,"",`≈ ${money(totAED)}`)}
+      ${kpiTile("Total VC raised (received)",`<span title="exact sum of tickets: $${Math.round(totReceived).toLocaleString()}">${money(headline,"$")}</span>`,`<span class="chip g">${received.length} of ${active.length} active investors</span>`,"",`≈ ${money(totAED)}${dep2026!=null?` · of which ${money(dep2026)} deployed in 2026 (per cashflow)`:""}`)}
       ${kpiTile("Committed (active)",money(totCommit,"$"),cancelled.length?`<span class="chip n">${cancelled.length} cancelled excluded</span>`:"","")}
       ${kpiTile("Deployed (weighted by status)",money(deployed,"$"),`<span class="chip n">${pct(knownDeploy?deployed/knownDeploy:null)} of ${fK(knownDeploy)} with % reported</span>`,"")}
       ${kpiTile("Pending next quarter · "+CONFIG.NEXT_Q,money(pendingTot,"$"),pending.length?`<span class="chip o">${pending.map(p=>p.name).join(", ")}</span>`:'<span class="chip n">none flagged</span>',"")}
@@ -896,56 +898,53 @@ function renderVC(){
 /* ================================================================
    PAGE: FUNDING SCENARIOS
    ================================================================ */
-function scenarioLines(base,opts){
-  /* returns {baseline, noVC, noLoan, noBoth} closing-balance trajectories on the locked forecast */
-  const vc=cumFill(base.vcIn||[]),loan=cumFill(base.loanIn||[]),repay=cumFill(base.loanRepay||[]);
-  const pre=opts.preVC||0;
-  const noVC=base.closing.map((c,m)=>c-vc[m]-pre);
-  const noLoan=base.closing.map((c,m)=>c-loan[m]+(opts.loanRepay?repay[m]:0));
-  const noBoth=base.closing.map((c,m)=>c-vc[m]-pre-loan[m]+(opts.loanRepay?repay[m]:0));
-  return{baseline:base.closing,noVC,noLoan,noBoth};}
+function liveFinancing(ent){const A=STATE.A[ENT_CASH_TAB[ent]];if(!A)return null;const disp=r=>split(r,CONFIG.LAST_ACTUAL.cash).display.map(v=>v==null?0:v);
+  const addRows=rows=>rows.reduce((acc,r)=>{const d=disp(r);return acc.map((v,i)=>v+d[i]);},new Array(12).fill(0));
+  return{vc:addRows(A.vcLines||[]),loan:addRows(A.loanLines||[]),repay:A.loanRepay?disp(A.loanRepay).map(Math.abs):new Array(12).fill(0)};}
+function scenarioLinesLive(ent,opts){
+  const FC=forecastCash(ent),F=liveFinancing(ent);if(!FC||!F)return null;const base=FC.closing.display;
+  const vc=cumFill(F.vc),loan=cumFill(F.loan),repay=cumFill(F.repay);const pre=opts.preVC||0;
+  return{baseline:base,noVC:base.map((c,m)=>c==null?null:c-vc[m]-pre),noLoan:base.map((c,m)=>c==null?null:c-loan[m]+(opts.loanRepay?repay[m]:0)),noBoth:base.map((c,m)=>c==null?null:c-vc[m]-pre-loan[m]+(opts.loanRepay?repay[m]:0)),
+    vcTot:sum(F.vc),loanTot:sum(F.loan),repayTot:sum(F.repay)};}
 function cashOutMonth(arr){const i=arr.findIndex(v=>v!=null&&v<0);return i<0?null:i;}
 function renderScenarios(){
-  const el=document.getElementById("pg-scenarios");const la=CONFIG.LAST_ACTUAL.cash;const W=win(la);const investors=readInvestors()||[];
-  const vcUSD=investors.filter(v=>!v.cancelled&&v.received).reduce((a,v)=>a+(v.amount||0),0);const vcAED=vcUSD*CONFIG.USD_AED;
-  const G=LOCKED.cash.realistic.group,C=LOCKED.cash.realistic.cpx,MN=LOCKED.cash.noFunding.moon,MA=LOCKED.cash.acceleration.moon;
-  const vc2026=sum(G.vcIn),loan2026=sum(G.loanIn),repay2026=sum(G.loanRepay);const preVC=Math.max(vcAED-vc2026,0);
-  /* live financing actuals if the group tab exposes them */
-  const gA=STATE.A.cf_group;const liveVC=gA&&gA.vcLines.length?sum(gA.vcLines.map(r=>sum(r.f,W.from,W.toA)||0)):null;const liveLoan=gA&&gA.loanLines.length?sum(gA.loanLines.map(r=>sum(r.f,W.from,W.toA)||0)):null;
+  const el=document.getElementById("pg-scenarios");const la=CONFIG.LAST_ACTUAL.cash;const investors=readInvestors()||[];
+  const headline=investors.sheetTotal!=null?investors.sheetTotal:investors.filter(v=>!v.cancelled&&v.received).reduce((s,v)=>s+(v.amount||0),0);const vcAED=headline*CONFIG.USD_AED;
+  const g0=scenarioLinesLive("group",{}),vc2026=g0?g0.vcTot:null,loan2026=g0?g0.loanTot:null,repay2026=g0?g0.repayTot:null;const preVC=vc2026!=null?Math.max(vcAED-vc2026,0):0;
   const opts={loanRepay:STATE.ui.scLoanRepay,preVC:STATE.ui.scPreVC?preVC:0};
-  const g=scenarioLines(G,opts),c=scenarioLines(C,opts),mn=scenarioLines(MN,opts),ma=scenarioLines(MA,opts);
-  const liveG=liveSeries("cash","group","closing"),liveM=liveSeries("cash","moon","closing"),liveC=liveSeries("cash","cpx","closing");
-  const co=(arr)=>{const i=cashOutMonth(arr);return i==null?'<span class="chip g">stays positive</span>':`<span class="chip r">cash-out ${MONTHS_S[i]}</span>`;};
+  const g=scenarioLinesLive("group",opts),m=scenarioLinesLive("moon",opts),c=scenarioLinesLive("cpx",opts);
+  const NF=LOCKED.cash.noFunding.moon,AC=LOCKED.cash.acceleration.moon;
+  const co=(arr)=>{if(!arr)return'<span class="chip n">—</span>';const i=cashOutMonth(arr);return i==null?'<span class="chip g">stays positive</span>':`<span class="chip r">cash-out ${MONTHS_S[i]}</span>`;};
+  const ye=arr=>arr?arr[11]:null;
+  if(!g){el.innerHTML=`<h1>Funding Scenarios</h1><div class="note">The Group cashflow tab didn't parse — see Data &amp; Method.</div>`;return;}
   el.innerHTML=`
-  <div class="hrow"><div><h1>Funding Scenarios</h1><div class="psub">What the locked cash plans look like without the funding that was raised · closing balance trajectories, AED</div></div></div>
+  <div class="hrow"><div><h1>Funding Scenarios</h1><div class="psub">The live cash path (booked + Finance forecast) with the funding actually received taken back out · closing balance, AED</div></div></div>
   <div class="grid">
     <div class="col12"><div class="ktiles">
-      ${kpiTile("Total VC funds raised",money(vcUSD,"$"),'<span class="chip n">received · Investment Summary</span>',"",`≈ ${money(vcAED)} · of which ${money(vc2026)} lands in the 2026 plan`)}
-      ${kpiTile("External financing raised · 2026",money(liveLoan!=null?liveLoan:loan2026),liveLoan!=null?'<span class="chip b">live actual YTD</span>':'<span class="chip n">locked plan (no live financing rows found)</span>',"",`loans · plan ${money(loan2026)}`)}
-      ${kpiTile("Loan repayments · 2026 plan",money(-repay2026),'<span class="chip n">outflow, locked realistic</span>',"")}
-      ${kpiTile("VC cash in 2026",money(liveVC!=null?liveVC:vc2026),liveVC!=null?'<span class="chip b">live actual YTD</span>':'<span class="chip n">locked plan</span>',"",`plan ${money(vc2026)}`)}
+      ${kpiTile("Total VC raised",money(headline,"$"),'<span class="chip n">Investment Summary</span>',"",`≈ ${money(vcAED)}`)}
+      ${kpiTile("VC deployed in 2026",money(vc2026),'<span class="chip b">per cashflow · VC rows</span>',"",vc2026!=null?`${money(preVC)} of the raise sits in opening cash`:"")}
+      ${kpiTile("Loans drawn in 2026",money(loan2026),'<span class="chip b">per cashflow · loan rows</span>',"")}
+      ${kpiTile("Loan repayments in 2026",money(repay2026!=null?-repay2026:null),'<span class="chip b">per cashflow</span>',"")}
     </div></div>
     <div class="card col12" style="padding:12px 18px"><div class="pillrow" style="margin:0">
-      <label class="toggle"><input type="checkbox" id="tg-repay" ${opts.loanRepay?"checked":""}> "No loans" also removes the 2026 loan repayments</label>
-      <label class="toggle"><input type="checkbox" id="tg-prevc" ${opts.preVC?"checked":""}> "No VC" also removes VC received before 2026 (${money(preVC)}) from opening cash</label>
-      <span class="chip n">Scenarios run on the locked plans; live closing balance overlaid for booked months</span></div></div>
-    <div class="card p0 col12"><div class="chd"><div class="eyebrow">Group</div><div class="ctitle">Closing balance — realistic vs without VC, without loans, without both</div></div><div class="chartbox tall"><canvas id="ch-sc-g"></canvas></div>
-      <div class="callouts">${[["Realistic",g.baseline],["No VC",g.noVC],["No loans",g.noLoan],["No VC & no loans",g.noBoth]].map(([k,a])=>`<div class="callout"><div class="k">${k}</div><div class="v tnum ${signCls(a[11])}">${fK(a[11])} <span style="color:var(--faint);font-weight:500;font-size:.7rem">year-end</span></div><div style="margin-top:3px">${co(a)}</div></div>`).join("")}</div></div>
-    <div class="card p0 col6"><div class="chd"><div class="eyebrow">Moontech</div><div class="ctitle">Without VC — on both Moontech scenarios</div><div class="csub">Loans don't touch Moontech.</div></div><div class="chartbox"><canvas id="ch-sc-m"></canvas></div>
-      <div class="callouts">${[["No funding",mn.baseline],["No funding − VC",mn.noVC],["Acceleration",ma.baseline],["Acceleration − VC",ma.noVC]].map(([k,a])=>`<div class="callout"><div class="k">${k}</div><div class="v tnum ${signCls(a[11])}">${fK(a[11])}</div><div style="margin-top:3px">${co(a)}</div></div>`).join("")}</div></div>
-    <div class="card p0 col6"><div class="chd"><div class="eyebrow">ITCAN · CPX</div><div class="ctitle">Without loans</div><div class="csub">VC doesn't touch ITCAN · CPX.</div></div><div class="chartbox"><canvas id="ch-sc-c"></canvas></div>
-      <div class="callouts">${[["Realistic",c.baseline],["No loans",c.noLoan]].map(([k,a])=>`<div class="callout"><div class="k">${k}</div><div class="v tnum ${signCls(a[11])}">${fK(a[11])}</div><div style="margin-top:3px">${co(a)}</div></div>`).join("")}</div></div>
+      <label class="toggle"><input type="checkbox" id="tg-repay" ${opts.loanRepay?"checked":""}> "No loans" also removes the loan repayments</label>
+      <label class="toggle"><input type="checkbox" id="tg-prevc" ${opts.preVC?"checked":""}> "No VC" also removes the VC received before 2026 (${money(preVC)}) from opening cash</label></div></div>
+    <div class="card p0 col12"><div class="chd"><div class="eyebrow">Group</div><div class="ctitle">Closing balance — live path vs without VC, without loans, without both</div></div><div class="chartbox tall"><canvas id="ch-sc-g"></canvas></div>
+      <div class="callouts">${[["Live path",g.baseline],["No VC",g.noVC],["No loans",g.noLoan],["No VC & no loans",g.noBoth]].map(([k,arr])=>`<div class="callout"><div class="k">${k}</div><div class="v tnum ${signCls(ye(arr))}">${fK(ye(arr))} <span style="color:var(--faint);font-weight:500;font-size:.7rem">year-end</span></div><div style="margin-top:3px">${co(arr)}</div></div>`).join("")}</div></div>
+    <div class="card p0 col6"><div class="chd"><div class="eyebrow">Moontech</div><div class="ctitle">Without the VC injected</div></div><div class="chartbox"><canvas id="ch-sc-m"></canvas></div>
+      <div class="callouts">${[["Live path",m&&m.baseline],["Live − VC",m&&m.noVC],["No-funding plan",NF.closing],["Acceleration plan",AC.closing]].map(([k,arr])=>`<div class="callout"><div class="k">${k}</div><div class="v tnum ${signCls(ye(arr))}">${fK(ye(arr))}</div><div style="margin-top:3px">${co(arr)}</div></div>`).join("")}</div></div>
+    <div class="card p0 col6"><div class="chd"><div class="eyebrow">ITCAN · CPX</div><div class="ctitle">Without the loans drawn</div></div><div class="chartbox"><canvas id="ch-sc-c"></canvas></div>
+      <div class="callouts">${[["Live path",c&&c.baseline],["Live − loans",c&&c.noLoan]].map(([k,arr])=>`<div class="callout"><div class="k">${k}</div><div class="v tnum ${signCls(ye(arr))}">${fK(ye(arr))}</div><div style="margin-top:3px">${co(arr)}</div></div>`).join("")}</div></div>
     <div class="card col12 method"><div class="eyebrow">How the scenarios are built</div>
-      <p>Each line starts from the locked plan's closing balance and subtracts the cumulative financing inflow being removed: <code>No VC</code> removes the VC rows in the financing section (${money(vc2026)} in the 2026 Group plan${STATE.ui.scPreVC?`, plus ${money(preVC)} of pre-2026 VC taken off opening cash`:""}); <code>No loans</code> removes the loan inflow rows (${money(loan2026)})${STATE.ui.scLoanRepay?` and adds back the ${money(repay2026)} of 2026 loan repayments`:" and, by default, keeps the loan repayments (they largely service pre-2026 debt — flip the toggle to see the alternative)"}. Everything else in the plan is held constant, so these are pure liquidity views, not re-forecasts of behaviour.</p></div>
+      <p>Each line starts from the live closing balance (booked months, then Finance's forecast) and subtracts the cumulative financing that tab actually records: <code>No VC</code> removes the VC rows (${money(vc2026)} in 2026${STATE.ui.scPreVC?`, plus ${money(preVC)} of pre-2026 VC taken off opening cash`:""}); <code>No loans</code> removes the loan rows (${money(loan2026)})${STATE.ui.scLoanRepay?` and adds back ${money(repay2026)} of repayments`:" and, by default, keeps the repayments"}. Nothing here comes from the forecast workbook's financing section. Everything else is held constant, so these are liquidity views, not re-forecasts of behaviour.</p></div>
   </div>`;
   document.getElementById("tg-repay").addEventListener("change",e=>{STATE.ui.scLoanRepay=e.target.checked;renderScenarios();});
   document.getElementById("tg-prevc").addEventListener("change",e=>{STATE.ui.scPreVC=e.target.checked;renderScenarios();});
   const line=(label,data,color,dash,w)=>({label,data,borderColor:color,borderDash:dash||[],borderWidth:w||2,pointRadius:0,tension:.3,spanGaps:false});
-  const liveL=(s)=>s?{label:"Live closing",data:s.actual,borderColor:cssVar("--teal"),borderWidth:2.4,pointRadius:3,pointBackgroundColor:cssVar("--teal"),tension:.3,spanGaps:false}:null;
-  mkChart("ch-sc-g",{type:"line",data:{labels:MONTHS_S,datasets:[line("Realistic",g.baseline,cssVar("--ink"),[],2.4),line("No VC",g.noVC,cssVar("--brand")),line("No loans",g.noLoan,cssVar("--blue")),line("No VC & no loans",g.noBoth,cssVar("--red")),liveL(liveG)].filter(Boolean)},options:baseOpts({scales:{y:{beginAtZero:false}}}),plugins:[zeroLinePlugin()]});
-  mkChart("ch-sc-m",{type:"line",data:{labels:MONTHS_S,datasets:[line("No funding",mn.baseline,cssVar("--ink"),[],2.4),line("No funding − VC",mn.noVC,cssVar("--brand")),line("Acceleration",ma.baseline,cssVar("--target"),[5,4]),line("Acceleration − VC",ma.noVC,cssVar("--brand"),[5,4]),liveL(liveM)].filter(Boolean)},options:baseOpts({scales:{y:{beginAtZero:false}}}),plugins:[zeroLinePlugin()]});
-  mkChart("ch-sc-c",{type:"line",data:{labels:MONTHS_S,datasets:[line("Realistic",c.baseline,cssVar("--ink"),[],2.4),line("No loans",c.noLoan,cssVar("--blue")),liveL(liveC)].filter(Boolean)},options:baseOpts({scales:{y:{beginAtZero:false}}}),plugins:[zeroLinePlugin()]});
-  mountInsights(el,insightsScenarios(g,mn,ma,c,vcAED,loan2026));}
+  mkChart("ch-sc-g",{type:"line",data:{labels:MONTHS_S,datasets:[line("Live path",g.baseline,cssVar("--ink"),[],2.4),line("No VC",g.noVC,cssVar("--brand-mid")),line("No loans",g.noLoan,cssVar("--blue")),line("No VC & no loans",g.noBoth,cssVar("--red"))]},options:baseOpts({scales:{y:{beginAtZero:false}}}),plugins:[zeroLinePlugin()]});
+  if(m)mkChart("ch-sc-m",{type:"line",data:{labels:MONTHS_S,datasets:[line("Live path",m.baseline,cssVar("--ink"),[],2.4),line("Live − VC",m.noVC,cssVar("--red")),line("No-funding plan",NF.closing,cssVar("--faint")),line("Acceleration plan",AC.closing,cssVar("--target"),[5,4])]},options:baseOpts({scales:{y:{beginAtZero:false}}}),plugins:[zeroLinePlugin()]});
+  if(c)mkChart("ch-sc-c",{type:"line",data:{labels:MONTHS_S,datasets:[line("Live path",c.baseline,cssVar("--ink"),[],2.4),line("Live − loans",c.noLoan,cssVar("--red"))]},options:baseOpts({scales:{y:{beginAtZero:false}}}),plugins:[zeroLinePlugin()]});
+  mountInsights(el,insightsScenarios(g,m,c,vcAED,vc2026,loan2026));}
 
 /* ================================================================
    PAGE: DATA & METHOD
@@ -1015,19 +1014,17 @@ function insightsEntityPnl(ent,title){const la=CONFIG.LAST_ACTUAL.pnl,W=win(la);
   return out;}
 function insightsCashCockpit(){const la=CONFIG.LAST_ACTUAL.cash,W=win(la);const out=[];const A=STATE.A.cf_group;if(!A)return out;const R=LOCKED.cash.realistic.group;
   const B=burnMetrics(A,la,W,R,"group");const FC=forecastCash("group");
-  out.push(ins(B.opBurn>=0?"good":"bad",B.opBurn>=0?"Group is operating cash-positive":`Group is burning ${money(-B.opBurn)}/month on an operating basis`,`Net ${money(B.netBurn)}/month including financing (${fK(B.finInSum)} raised, ${fK(B.repaySum)} repaid in ${W.label}); gross burn ${money(-B.grossBurn)} vs ${money(-B.planOut)} planned.${B.cashOut!=null?` Runway ${B.monthsLeft} months → ${B.cashOutLabel} on Finance's forecast.`:""}`));
+  out.push(ins(B.opBurn>=0?"good":"bad",B.opBurn>=0?"Group is operating cash-positive":`Group is burning ${money(-B.opBurn)}/month on an operating basis`,`Net ${money(B.netBurn)}/month including VC & loans (${fK(B.finInSum)} raised, ${fK(B.repaySum)} repaid in ${W.label}); gross burn ${money(-B.grossBurn)} vs ${money(-B.planOut)} planned.${B.cashOut!=null?` Runway ${B.monthsLeft} months → ${B.cashOutLabel} on Finance's forecast.`:""}`));
   if(B.cash!=null)out.push(ins(B.cash>=R.closing[W.toA]?"good":"bad",`Cash ${money(B.cash)} at end ${MONTHS_S[W.toA]}`,`${B.cash>=R.closing[W.toA]?"Ahead of":"Behind"} the realistic plan by ${fK(Math.abs(B.cash-R.closing[W.toA]))}.${FC?` On Finance's forecast, year-end cash ${money(FC.yearEnd)}${FC.cashOut!=null?`; the balance goes negative in ${MONTHS[FC.cashOut]} — ${FC.monthsLeft} months of runway.`:"; the balance stays positive through December."}`:""}`));
-  if(B.trend!=null)out.push(ins(B.trend>=0?"good":"bad",`Burn ${B.trend>=0?"easing":"worsening"} by ${fK(Math.abs(B.trend))}/month`,"Last three booked months against the three before."));
   ["moon","cpx"].forEach(e=>{const Ae=STATE.A[ENT_CASH_TAB[e]];if(!Ae)return;const base=e==="moon"?LOCKED.cash.noFunding.moon:LOCKED.cash.realistic[e];const Be=burnMetrics(Ae,la,W,base,e);
     out.push(ins(Be.netBurn>=(Be.planNet||0)?"good":"bad",`${ENT_LABEL[e]} · net ${money(Be.netBurn)}/month`,`${Be.netBurn>=(Be.planNet||0)?"Better":"Worse"} than the ${e==="moon"?"no-funding":"realistic"} plan's ${money(Be.planNet)}; operating burn ${money(Be.opBurn)}; runway ${Be.cashOut!=null?Be.monthsLeft+" months → "+Be.cashOutLabel:"beyond December on the forecast"}.`));});
   return out;}
 function insightsEntityCash(ent,title){const la=CONFIG.LAST_ACTUAL.cash,W=win(la);const A=STATE.A[ENT_CASH_TAB[ent]];if(!A)return[];const base=ent==="moon"?LOCKED.cash.noFunding.moon:LOCKED.cash.realistic[ent];
   const B=burnMetrics(A,la,W,base,ent),FC=forecastCash(ent);const out=[];
-  out.push(ins(B.opBurn>=0?"good":"bad",B.opBurn>=0?`${title.split(" ")[0]} is operating cash-positive`:`${title.split(" ")[0]} burns ${money(-B.opBurn)}/month on an operating basis`,`Net ${money(B.netBurn)}/month including financing; plan ${money(B.planNet)}; inflows cover ${pct(B.cover)} of outflows.${B.cashOut!=null?` Runway ${B.monthsLeft} months → ${B.cashOutLabel} on Finance's forecast.`:""}`));
+  out.push(ins(B.opBurn>=0?"good":"bad",B.opBurn>=0?`${title.split(" ")[0]} is operating cash-positive`:`${title.split(" ")[0]} burns ${money(-B.opBurn)}/month on an operating basis`,`Net ${money(B.netBurn)}/month including ${finLabel(ent)}; plan ${money(B.planNet)}; inflows cover ${pct(B.cover)} of outflows.${B.cashOut!=null?` Runway ${B.monthsLeft} months → ${B.cashOutLabel} on Finance's forecast.`:""}`));
   if(FC&&FC.yearEnd!=null)out.push(ins(FC.cashOut==null?"good":"bad",FC.cashOut==null?`Forecast year-end cash ${money(FC.yearEnd)}`:`Forecast cash runs out in ${MONTHS[FC.cashOut]}`,FC.cashOut==null?"Finance's forecast keeps the balance positive through December.":`${FC.monthsLeft} months from the last booked month, on the cashflow forecast maintained in the sheet.`));
   if(ent==="moon"){const NF=LOCKED.cash.noFunding.moon,AC=LOCKED.cash.acceleration.moon;const o=split(A.outflow,la);const p=corridorPos(Math.abs(sum(o.actual,W.from,W.toA)||0),sum(NF.outflow,W.from,W.toA),sum(AC.outflow,W.from,W.toA));
     if(p!=null)out.push(ins("neutral",`Spend ramp ${(p*100).toFixed(0)}% toward acceleration`,p<0.25?"Still spending like the no-funding plan — the ramp has barely started.":p<0.75?"Mid-ramp: funds are being deployed, spending is between the two plans.":"Spending is close to the acceleration plan; cash cover should be watched against the funding schedule."));}
-  if(B.trend!=null)out.push(ins(B.trend>=0?"good":"bad",`Burn ${B.trend>=0?"easing":"worsening"} by ${fK(Math.abs(B.trend))}/month`,"Last three booked months vs the three before."));
   return out;}
 function insightsVariance(rows,ent,scen,isCash){const out=[];const live=rows.filter(r=>r.varY!=null);if(!live.length)return out;
   const fav=live.filter(r=>r.fav).sort((x,y)=>Math.abs(y.varY)-Math.abs(x.varY)),unf=live.filter(r=>!r.fav).sort((x,y)=>Math.abs(y.varY)-Math.abs(x.varY));
@@ -1042,10 +1039,10 @@ function insightsVC(active,received,deployed,knownDeploy,pending,pendingTot){con
   out.push(ins(rec>=com?"good":"neutral",`$${Math.round(rec).toLocaleString()} of $${Math.round(com).toLocaleString()} committed has landed`,rec>=com?"Every active ticket is in the bank.":`${active.length-received.length} ticket(s) still outstanding.`));
   out.push(ins(knownDeploy&&deployed/knownDeploy>=0.75?"good":"neutral",`${pct(knownDeploy?deployed/knownDeploy:null)} deployed of tickets with a reported status`,`$${Math.round(deployed).toLocaleString()} put to work; $${Math.round(pendingTot).toLocaleString()} scheduled for ${CONFIG.NEXT_Q}${pending.length?" ("+pending.map(p=>p.name).join(", ")+")":""}.`));
   return out;}
-function insightsScenarios(g,mn,ma,c,vcAED,loan2026){const out=[];const co=arr=>cashOutMonth(arr);
-  out.push(ins(co(g.noBoth)==null?"good":"bad",`Without VC and loans, Group ${co(g.noBoth)==null?"stays positive":"runs out of cash in "+MONTHS[co(g.noBoth)]}`,`Year-end ${fK(g.noBoth[11])} vs ${fK(g.baseline[11])} on the realistic plan. Funding raised: ≈${fK(vcAED)} VC, ${fK(loan2026)} loans in 2026.`));
-  out.push(ins(co(mn.noVC)==null?"good":"bad",`Moontech without VC ${co(mn.noVC)==null?"stays positive":"goes negative in "+MONTHS[co(mn.noVC)]}`,`No-funding plan minus VC: year-end ${fK(mn.noVC[11])}; acceleration minus VC: ${fK(ma.noVC[11])}.`));
-  out.push(ins(co(c.noLoan)==null?"good":"bad",`ITCAN · CPX without loans ${co(c.noLoan)==null?"stays positive":"goes negative in "+MONTHS[co(c.noLoan)]}`,`Year-end ${fK(c.noLoan[11])} vs ${fK(c.baseline[11])} with the loan.`));return out;}
+function insightsScenarios(g,m,c,vcAED,vc2026,loan2026){const out=[];const co=arr=>arr?cashOutMonth(arr):null;
+  out.push(ins(co(g.noBoth)==null?"good":"bad",`Without VC and loans, Group ${co(g.noBoth)==null?"stays positive":"runs out of cash in "+MONTHS[co(g.noBoth)]}`,`Year-end ${fK(g.noBoth[11])} vs ${fK(g.baseline[11])} on the live path. Deployed in 2026: ${fK(vc2026)} VC, ${fK(loan2026)} loans.`));
+  if(m)out.push(ins(co(m.noVC)==null?"good":"bad",`Moontech without the VC ${co(m.noVC)==null?"stays positive":"goes negative in "+MONTHS[co(m.noVC)]}`,`Year-end ${fK(m.noVC[11])} vs ${fK(m.baseline[11])} with it.`));
+  if(c)out.push(ins(co(c.noLoan)==null?"good":"bad",`ITCAN · CPX without the loans ${co(c.noLoan)==null?"stays positive":"goes negative in "+MONTHS[co(c.noLoan)]}`,`Year-end ${fK(c.noLoan[11])} vs ${fK(c.baseline[11])} with them.`));return out;}
 function mountInsights(el,items){
   if(!items||!items.length)return;const grid=el.querySelector(".grid");if(!grid)return;
   const hidden=STATE.ui.insightsHidden;
@@ -1078,7 +1075,7 @@ function initNav(){const links=[...document.querySelectorAll(".nav a")];
   links.forEach(a=>a.addEventListener("click",e=>{e.preventDefault();try{history.replaceState(null,"",a.getAttribute("href"));}catch(err){}go(a.getAttribute("href"));}));go(location.hash);}
 async function boot(){
   if(typeof Chart!=="undefined"){Chart.defaults.font.family="'Inter',system-ui,sans-serif";Chart.defaults.color="#6A7382";}
-  const keys=Object.keys(CONFIG.TABS);document.getElementById("loadmsg").textContent="Fetching "+keys.length+" live tabs from Google Sheets…";
+  const keys=Object.keys(CONFIG.TABS);document.getElementById("loadmsg").textContent="Loading…";
   await Promise.all(keys.map(fetchTab));
   /* booked-month detection: Status row / "Actuals through" cell on the group tabs; falls back to CONFIG */
   STATE.laSource={};[["pnl","pnl_group"],["cash","cf_group"]].forEach(([kind,key])=>{const h=STATE.health[key];const det=h&&h.raw?detectLastActual(h.raw):null;
