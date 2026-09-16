@@ -626,28 +626,35 @@ function burnMetrics(A,la,W,base,ent){
   const avg=v=>v.length?v.reduce((x,y)=>x+y,0)/v.length:null;
   const netV=win_(netc&&netc.actual),outV=win_(outflow&&outflow.actual).map(Math.abs),inV=win_(inflow&&inflow.actual);
   const netBurn=avg(netV);const grossBurn=avg(outV);const avgIn=avg(inV);
+  /* operating view: strip financing inflows (VC, loans) and loan repayments from the net movement */
+  const finRows=(A.finLines||[]);const finIn=MONTHS_S.map((_,m)=>m<=la?finRows.reduce((s,r)=>s+(r.f[m]||0),0):null);
+  const repay=A.loanRepay?split(A.loanRepay,la).actual.map(v=>v==null?0:Math.abs(v)):new Array(12).fill(0);
+  const opNet=netc?netc.actual.map((v,m)=>v==null?null:v-(finIn[m]||0)+(repay[m]||0)):null;
+  const opBurn=avg(win_(opNet));const finInSum=sum(finIn,W.from,W.toA)||0,repaySum=sum(repay,W.from,W.toA)||0;
   const cash=closing?(closing.actual[W.toA]!=null?closing.actual[W.toA]:null):null;
-  const runway=(netBurn!=null&&netBurn<0&&cash!=null&&cash>0)?cash/(-netBurn):null;
+  const runway=(opBurn!=null&&opBurn<0&&cash!=null&&cash>0)?cash/(-opBurn):null;
+  let runwayLabel=null;if(runway!=null){const total=W.toA+1+runway;const yr=2026+Math.floor(total/12);const mo=Math.floor(total%12);runwayLabel=MONTHS[mo]+" "+yr;}
   const planNet=base?avg(base.net.slice(W.from,W.toA+1)):null;const planOut=base?avg(base.outflow.slice(W.from,W.toA+1)):null;
-  /* trend: last 3 booked months vs prior 3 */
   const nA=netc?netc.actual:[];const l3=[],p3=[];for(let m=la;m>=0&&l3.length<3;m--)if(nA[m]!=null)l3.push(nA[m]);for(let m=la-3;m>=0&&p3.length<3;m--)if(nA[m]!=null)p3.push(nA[m]);
   const trend=(l3.length===3&&p3.length===3)?avg(l3)-avg(p3):null;
-  /* projected cash-out on the live forward path */
   let cashOut=null;const PC=ent?projectCash(ent):null;if(PC){cashOut=PC.cashOut;}else if(closing){for(let m=la+1;m<12;m++){if(closing.display[m]!=null&&closing.display[m]<0){cashOut=m;break;}}}
-  /* if the projection never turns negative in 2026 but burn is positive, extrapolate beyond December */
-  let cashOutLabel=cashOut!=null?MONTHS[cashOut]+" 2026":null;if(cashOutLabel==null&&runway!=null){const total=W.toA+1+runway;const yr=2026+Math.floor(total/12);const mo=Math.floor(total%12);cashOutLabel=MONTHS[mo]+" "+yr;}
-  const cover=(grossBurn&&avgIn!=null)?avgIn/grossBurn:null; // inflow coverage of outflows
-  return{netBurn,grossBurn,avgIn,cash,runway,planNet,planOut,trend,cashOut,cashOutLabel,cover};}
+  const cashOutLabel=cashOut!=null?MONTHS[cashOut]+" 2026":null;
+  const cover=(grossBurn&&avgIn!=null)?avgIn/grossBurn:null;
+  return{netBurn,grossBurn,avgIn,cash,runway,runwayLabel,opBurn,finInSum,repaySum,planNet,planOut,trend,cashOut,cashOutLabel,cover};}
 function burnTiles(B,W,la,scope){
-  const status=B.netBurn==null?"—":(B.netBurn>=0?`<span class="pos">Cash-positive</span>`:`<span class="neg">Burning</span>`);
-  const statusChip=B.netBurn==null?"":(B.netBurn>=0?`<span class="chip g">net inflow ${fK(B.netBurn)} / month</span>`:`<span class="chip r">net outflow ${fK(-B.netBurn)} / month</span>`);
-  return`<div class="card col12" style="padding:14px 18px"><div class="hrow"><div><div class="eyebrow">Burn · ${scope}</div><div class="ctitle" style="font-size:.95rem">Booked months in ${W.label}${W.isYTD?"":" · trend and runway use full booked history"}</div></div></div>
+  const opPos=B.opBurn!=null&&B.opBurn>=0;
+  const status=B.opBurn==null?"—":(opPos?`<span class="pos">Cash-positive</span>`:`<span class="neg">Burning</span>`);
+  const statusChip=B.opBurn==null?"":(opPos?`<span class="chip g">operating +${fK(B.opBurn)} / month</span>`:`<span class="chip r">operating −${fK(-B.opBurn)} / month</span>`)+(B.netBurn!=null?`<span class="chip n">incl. financing ${B.netBurn>=0?"+":"−"}${fK(Math.abs(B.netBurn))} / month</span>`:"");
+  const rwVal=B.runway!=null?`${B.runway.toFixed(1)} mo`:(opPos?"Not needed":"—");
+  const rwChips=(B.runway!=null?`<span class="chip ${B.runway<6?'r':(B.runway<12?'o':'g')}">cash lasts to ${B.runwayLabel}</span>`:(opPos?'<span class="chip g">operating cash-positive</span>':''))+(B.cashOut!=null?`<span class="chip r">projected path goes negative ${B.cashOutLabel}</span>`:'<span class="chip n">projected path stays positive in 2026</span>');
+  return`<div class="card col12" style="padding:14px 18px"><div class="hrow"><div><div class="eyebrow">Burn · ${scope}</div><div class="ctitle" style="font-size:.95rem">Booked months in ${W.label}${W.isYTD?"":" · trend and runway use full booked history"}</div></div><span class="chip n">financing in period: +${fK(B.finInSum)} raised · −${fK(B.repaySum)} repaid</span></div>
     <div class="ktiles" style="margin-top:12px">
-      ${kpiTile("Net burn / month",`<span class="${signCls(B.netBurn)}">${money(B.netBurn)}</span>`,B.planNet!=null?deltaChip(B.netBurn!=null?B.netBurn-B.planNet:null,true,fK," vs plan"):"","",B.planNet!=null?`plan ${money(B.planNet)}`:"",'Net burn = average monthly net cash movement (inflows − outflows) over the booked months shown. Negative means cash is leaving faster than it arrives.')}
+      ${kpiTile("Net burn / month",`<span class="${signCls(B.netBurn)}">${money(B.netBurn)}</span>`,B.planNet!=null?deltaChip(B.netBurn!=null?B.netBurn-B.planNet:null,true,fK," vs plan"):"","",B.planNet!=null?`plan ${money(B.planNet)}`:"",'Net burn = average monthly net cash movement (all inflows − all outflows, financing included) over the booked months shown. Negative means cash is leaving faster than it arrives.')}
+      ${kpiTile("Operating burn / month",`<span class="${signCls(B.opBurn)}">${money(B.opBurn)}</span>`,B.netBurn!=null&&B.opBurn!=null?`<span class="chip n">financing effect ${fK(B.netBurn-B.opBurn)} / month</span>`:"","","excludes VC, loans, loan repayments",'Operating burn = net burn with financing stripped out: VC and loan inflows removed, loan repayments added back. The rate at which the business itself consumes cash — the number runway is built on.')}
       ${kpiTile("Gross burn / month",`<span class="neg">${money(B.grossBurn!=null?-B.grossBurn:null)}</span>`,B.planOut!=null?costChip(B.grossBurn,B.planOut):"","",B.planOut!=null?`plan ${money(-B.planOut)}`:"",'Gross burn = average monthly total outflows over the booked months shown, before any inflows. The raw spend rate.')}
       ${kpiTile("Inflow coverage of outflows",pct(B.cover),`<span class="chip ${B.cover>=1?'g':'r'}">${B.cover>=1?"self-funding":"drawing down cash"}</span>`,"",`avg inflow ${money(B.avgIn)}`,'Average monthly inflows ÷ average monthly outflows. Above 100% the business funds itself; below, it draws on the cash balance.')}
-      ${kpiTile("Current status",status,statusChip,"",B.cash!=null?`cash ${fK(B.cash)} at end ${MONTHS_S[W.toA]}`:"",'Cash-positive when net burn is zero or better over the booked months shown; Burning when net burn is negative.')}
-      ${kpiTile("Runway",B.netBurn!=null&&B.netBurn>=0&&B.cashOut==null?"Not applicable":(B.cashOutLabel||"Beyond 2026"),B.netBurn!=null&&B.netBurn>=0&&B.cashOut==null?'<span class="chip g">cash-positive at current run-rate</span>':(B.cashOut!=null?'<span class="chip r">first negative month on the projected path</span>':`<span class="chip n">${B.runway!=null?B.runway.toFixed(1)+" months at current net burn":"—"}</span>`),"","",'The month the projected closing balance first goes below zero. Projection = booked actuals, then the locked plan\'s remaining months scaled by YTD performance. If the projection stays positive through December, runway is extrapolated from current net burn.')}
+      ${kpiTile("Current status",status,statusChip,"",B.cash!=null?`cash ${fK(B.cash)} at end ${MONTHS_S[W.toA]}`:"",'Judged on operating burn: Cash-positive when the business covers its own outflows without financing; Burning when it does not. The grey chip shows the picture including financing.')}
+      ${kpiTile("Runway",rwVal,rwChips,"","at current operating burn",'Cash at end of period ÷ operating burn per month = months of cash left if nothing changes and no new financing arrives. Shown with the month it runs to. The second chip is a different lens: the month the code projection (plan seasonality × your run-rate) first turns the closing balance negative within 2026.')}
       ${kpiTile("Burn trend · last 3 vs prior 3",B.trend==null?"—":`<span class="${signCls(B.trend)}">${money(B.trend)}</span>`,B.trend==null?'<span class="chip n">needs 6 booked months</span>':`<span class="chip ${B.trend>=0?'g':'r'}">${B.trend>=0?"improving":"worsening"}</span>`,"","",'Average net cash movement of the last three booked months minus the three before. Positive = burn easing.')}
     </div></div>`;}
 
@@ -1001,15 +1008,15 @@ function insightsEntityPnl(ent,title){const la=CONFIG.LAST_ACTUAL.pnl,W=win(la);
   return out;}
 function insightsCashCockpit(){const la=CONFIG.LAST_ACTUAL.cash,W=win(la);const out=[];const A=STATE.A.cf_group;if(!A)return out;const R=LOCKED.cash.realistic.group;
   const B=burnMetrics(A,la,W,R,"group");const PC=projectCash("group");
-  out.push(ins(B.netBurn>=0?"good":"bad",B.netBurn>=0?"Group is cash-positive":"Group is burning cash",`Net ${money(B.netBurn)} per month over booked months in ${W.label} (plan ${money(B.planNet)}); gross burn ${money(-B.grossBurn)} vs ${money(-B.planOut)} planned. Inflows cover ${pct(B.cover)} of outflows.`));
+  out.push(ins(B.opBurn>=0?"good":"bad",B.opBurn>=0?"Group is operating cash-positive":`Group is burning ${money(-B.opBurn)}/month on an operating basis`,`Net ${money(B.netBurn)}/month including financing (${fK(B.finInSum)} raised, ${fK(B.repaySum)} repaid in ${W.label}); gross burn ${money(-B.grossBurn)} vs ${money(-B.planOut)} planned.${B.runway!=null?` Runway ${B.runway.toFixed(1)} months → ${B.runwayLabel}.`:""}`));
   if(B.cash!=null)out.push(ins(B.cash>=R.closing[W.toA]?"good":"bad",`Cash ${money(B.cash)} at end ${MONTHS_S[W.toA]}`,`${B.cash>=R.closing[W.toA]?"Ahead of":"Behind"} the realistic plan by ${fK(Math.abs(B.cash-R.closing[W.toA]))}.${PC?` Projected year-end cash ${money(PC.fy.closing)}${PC.cashOut!=null?`; balance turns negative in ${MONTHS[PC.cashOut]}.`:"; stays positive through December on current run-rate."}`:""}`));
   if(B.trend!=null)out.push(ins(B.trend>=0?"good":"bad",`Burn ${B.trend>=0?"easing":"worsening"} by ${fK(Math.abs(B.trend))}/month`,"Last three booked months against the three before."));
   ["moon","cpx"].forEach(e=>{const Ae=STATE.A[ENT_CASH_TAB[e]];if(!Ae)return;const base=e==="moon"?LOCKED.cash.noFunding.moon:LOCKED.cash.realistic[e];const Be=burnMetrics(Ae,la,W,base,e);
-    out.push(ins(Be.netBurn>=(Be.planNet||0)?"good":"bad",`${ENT_LABEL[e]} · net ${money(Be.netBurn)}/month`,`${Be.netBurn>=(Be.planNet||0)?"Better":"Worse"} than the ${e==="moon"?"no-funding":"realistic"} plan's ${money(Be.planNet)}; runway ${Be.netBurn>=0?"not applicable (cash-positive)":(Be.cashOutLabel||"beyond 2026")}.`));});
+    out.push(ins(Be.netBurn>=(Be.planNet||0)?"good":"bad",`${ENT_LABEL[e]} · net ${money(Be.netBurn)}/month`,`${Be.netBurn>=(Be.planNet||0)?"Better":"Worse"} than the ${e==="moon"?"no-funding":"realistic"} plan's ${money(Be.planNet)}; operating burn ${money(Be.opBurn)}; runway ${Be.runway!=null?Be.runway.toFixed(1)+" months → "+Be.runwayLabel:"not needed (operating cash-positive)"}.`));});
   return out;}
 function insightsEntityCash(ent,title){const la=CONFIG.LAST_ACTUAL.cash,W=win(la);const A=STATE.A[ENT_CASH_TAB[ent]];if(!A)return[];const base=ent==="moon"?LOCKED.cash.noFunding.moon:LOCKED.cash.realistic[ent];
   const B=burnMetrics(A,la,W,base,ent),PC=projectCash(ent);const out=[];
-  out.push(ins(B.netBurn>=0?"good":"bad",B.netBurn>=0?`${title.split(" ")[0]} is cash-positive`:`${title.split(" ")[0]} is burning ${money(-B.netBurn)}/month`,`Plan ${money(B.planNet)}; inflows cover ${pct(B.cover)} of outflows. ${B.netBurn>=0?"":"Runway "+(B.cashOutLabel||"beyond 2026")+"."}`));
+  out.push(ins(B.opBurn>=0?"good":"bad",B.opBurn>=0?`${title.split(" ")[0]} is operating cash-positive`:`${title.split(" ")[0]} burns ${money(-B.opBurn)}/month on an operating basis`,`Net ${money(B.netBurn)}/month including financing; plan ${money(B.planNet)}; inflows cover ${pct(B.cover)} of outflows.${B.runway!=null?` Runway ${B.runway.toFixed(1)} months → ${B.runwayLabel}.`:""}`));
   if(PC)out.push(ins(PC.fy.closing>=0?"good":"bad",`Projected year-end cash ${money(PC.fy.closing)}`,`Inflows running at ${(PC.ratios.inflow*100).toFixed(0)}% and outflows at ${(PC.ratios.outflow*100).toFixed(0)}% of the ${ent==="moon"?"no-funding":"realistic"} plan, applied to the remaining months.`));
   if(ent==="moon"){const NF=LOCKED.cash.noFunding.moon,AC=LOCKED.cash.acceleration.moon;const o=split(A.outflow,la);const p=corridorPos(Math.abs(sum(o.actual,W.from,W.toA)||0),sum(NF.outflow,W.from,W.toA),sum(AC.outflow,W.from,W.toA));
     if(p!=null)out.push(ins("neutral",`Spend ramp ${(p*100).toFixed(0)}% toward acceleration`,p<0.25?"Still spending like the no-funding plan — the ramp has barely started.":p<0.75?"Mid-ramp: funds are being deployed, spending is between the two plans.":"Spending is close to the acceleration plan; cash cover should be watched against the funding schedule."));}
