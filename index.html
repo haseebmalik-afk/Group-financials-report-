@@ -775,7 +775,9 @@ function renderVC(){
     investors.map(v=>{const st=v.cancelled?'<span class="chip r">Cancelled</span>':(v.received?'<span class="chip g">Received</span>':`<span class="chip n">${esc(v.status||"—")}</span>`);
       const dp=v.deploy==null?'<span class="chip n">—</span>':(v.deploy>=100?'<span class="chip g">100%</span>':`<span class="chip o">${v.deploy}%</span>`);
       return`<tr${v.cancelled?' class="muted"':''}><td>${esc(v.name)}</td><td class="tnum">${v.amount!=null?"$"+Math.round(v.amount).toLocaleString():"—"}</td><td style="text-align:left">${st}</td><td style="text-align:left">${v.cancelled?'<span class="chip n">—</span>':qStrip(v)}</td><td>${dp}</td></tr>`;}).join("")+
-    `<tr class="band"><td>Total (active)</td><td class="tnum">$${Math.round(totCommit).toLocaleString()}</td><td></td><td></td><td></td></tr></tbody>`;}
+    (()=>{const qTot=QUARTERS.map(q=>Object.values(byQ[q]).reduce((s,v)=>s+v,0));const allocTot=qTot.reduce((s,v)=>s+v,0);
+      const strip=`<span class="qstrip">${qTot.map((v,i)=>`<span class="qcell ${v?'has':''}" style="${v?'background:rgba(255,255,255,.14);color:#fff':'background:rgba(255,255,255,.06)'}" title="${QUARTERS[i]}: $${Math.round(v).toLocaleString()}">${v?fK(v):""}</span>`).join("")}</span>`;
+      return`<tr class="band"><td>Total (active) · ${active.length} investors</td><td class="tnum">$${Math.round(totCommit).toLocaleString()}</td><td style="text-align:left"><span class="chip g">$${Math.round(totReceived).toLocaleString()} received</span></td><td style="text-align:left">${strip}<div style="font-size:.66rem;font-weight:500;opacity:.8;margin-top:3px">allocated $${Math.round(allocTot).toLocaleString()} · pending ${CONFIG.NEXT_Q} $${Math.round(pendingTot).toLocaleString()}</div></td><td><span class="chip g">$${Math.round(deployed).toLocaleString()} · ${pct(knownDeploy?deployed/knownDeploy:null)}</span></td></tr></tbody>`;})();}
 
 /* ================================================================
    PAGE: FUNDING SCENARIOS
