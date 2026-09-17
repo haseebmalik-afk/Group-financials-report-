@@ -355,46 +355,36 @@ function baseline(kind,scen,ent,k){const b=LOCKED[kind]&&LOCKED[kind][scen]&&LOC
    PROJECTION — code-side FY outlook: booked actuals + plan seasonality scaled by YTD performance ratio
    ================================================================ */
 function perfRatio(actual,plan,la){const A=sum(actual,0,la),P=sum(plan,0,la);if(A==null||!P)return 1;const r=A/P;return isFinite(r)?Math.max(0,Math.min(r,3)):1;}
+/* trailing window: last N booked months */
+const TRAIL=3;
+function trailAvg(arr,la){const v=[];for(let m=Math.max(0,la-TRAIL+1);m<=la;m++)if(arr&&arr[m]!=null)v.push(arr[m]);return v.length?v.reduce((x,y)=>x+y,0)/v.length:null;}
 function projectPnl(ent){
   const la=CONFIG.LAST_ACTUAL.pnl;const tabKey=ENT_PNL_TAB[ent];const A=STATE.A[tabKey];const R=LOCKED.pnl.realistic[ent];if(!A||!A.sales||!R)return null;
-  /* Group = bottom-up sum of the entity projections, so the cockpit always reconciles to the unit pages.
-     Booked months come from the Group tab; projected months are Moontech + ITCAN·CPX, line by line. */
+  const S=k=>A[k]?split(A[k],la):null;const sales=S("sales"),cos=S("cos"),totExp=S("totExp"),gp=S("gp"),net=S("net");
+  const mk=(act,proj)=>({actual:act,proj,display:act.map((v,i)=>i<=la?v:proj[i])});
+  /* Group = bottom-up sum of the unit projections; booked months from the Group tab */
   if(ent==="group"){const M=projectPnl("moon"),C=projectPnl("cpx");
-    if(M&&C){const S=k=>A[k]?split(A[k],la):null;const sales=S("sales"),cos=S("cos"),totExp=S("totExp"),gp=S("gp"),net=S("net");
-      const add=(k)=>MONTHS_S.map((_,m)=>m<=la?null:((M[k].proj[m]||0)+(C[k].proj[m]||0)));
-      const pS=add("sales"),pC=add("cos"),pE=add("totExp"),pG=add("gp"),pN=add("net");
-      const mk=(act,proj)=>({actual:act,proj,display:act.map((v,i)=>i<=la?v:proj[i])});
-      const out={ratios:{sales:perfRatio(sales.actual,R.sales,la),cos:cos?perfRatio(cos.actual,R.cos,la):1,totExp:totExp?perfRatio(totExp.actual,R.totExp,la):1,moon:M.ratios,cpx:C.ratios},la,bottomUp:true};
-      out.sales=mk(sales.actual,pS);out.cos=mk(cos?cos.actual:new Array(12).fill(null),pC);out.totExp=mk(totExp?totExp.actual:new Array(12).fill(null),pE);
-      out.gp=mk(gp?gp.actual:new Array(12).fill(null),pG);out.net=mk(net?net.actual:new Array(12).fill(null),pN);
+    if(M&&C){const add=(k)=>MONTHS_S.map((_,m)=>m<=la?null:((M[k].proj[m]||0)+(C[k].proj[m]||0)));
+      const out={la,bottomUp:true,method:"trailing",ratios:{moon:M.ratios,cpx:C.ratios}};
+      out.sales=mk(sales.actual,add("sales"));out.cos=mk(cos?cos.actual:new Array(12).fill(null),add("cos"));out.totExp=mk(totExp?totExp.actual:new Array(12).fill(null),add("totExp"));
+      out.gp=mk(gp?gp.actual:new Array(12).fill(null),add("gp"));out.net=mk(net?net.actual:new Array(12).fill(null),add("net"));
       out.fy={sales:sum(out.sales.display),gp:sum(out.gp.display),totExp:sum(out.totExp.display),net:sum(out.net.display)};out.sheetFy={sales:sum(sales.display),net:net?sum(net.display):null};
       return out;}}
-  const S=k=>A[k]?split(A[k],la):null;const sales=S("sales"),cos=S("cos"),totExp=S("totExp"),gp=S("gp"),net=S("net");
-  const rS=perfRatio(sales.actual,R.sales,la),rC=cos?perfRatio(cos.actual,R.cos,la):rS,rE=totExp?perfRatio(totExp.actual,R.totExp,la):1;
-  const out={ratios:{sales:rS,cos:rC,totExp:rE},la};
-  const mk=(act,proj)=>({actual:act,proj,display:act.map((v,i)=>i<=la?v:proj[i])});
-  const pS=MONTHS_S.map((_,m)=>m<=la?null:(R.sales[m]||0)*rS),pC=MONTHS_S.map((_,m)=>m<=la?null:(R.cos[m]||0)*rC),pE=MONTHS_S.map((_,m)=>m<=la?null:(R.totExp[m]||0)*rE);
+  /* Unit projection — trailing 3-month run-rate × the locked plan's seasonal shape:
+       revenue[m]  = trailing actual revenue avg × (plan revenue[m] ÷ plan revenue avg over the same trailing months)
+       cost of sales[m] = revenue[m] × trailing gross-margin complement (trailing CoS ÷ trailing revenue)
+       opex[m]     = trailing actual opex avg, flat (opex is not seasonal)
+       GP and net derived. */
+  const tS=trailAvg(sales.actual,la),tSP=trailAvg(R.sales,la);const tC=cos?trailAvg(cos.actual,la):null;const tE=totExp?trailAvg(totExp.actual,la):null;
+  const cosRatio=(tS&&tC!=null)?tC/tS:(sum(R.cos,0,la)/sum(R.sales,0,la));
+  const pS=MONTHS_S.map((_,m)=>m<=la?null:(tS!=null&&tSP?tS*((R.sales[m]||0)/tSP):(R.sales[m]||0)));
+  const pC=pS.map((v,m)=>v==null?null:v*cosRatio);const pE=MONTHS_S.map((_,m)=>m<=la?null:(tE!=null?tE:(R.totExp[m]||0)));
   const pG=pS.map((v,m)=>v==null?null:v-pC[m]),pN=pG.map((v,m)=>v==null?null:v-pE[m]);
+  const out={la,method:"trailing",ratios:{sales:(tS&&tSP)?tS/tSP:1,cos:cosRatio,totExp:(tE!=null&&trailAvg(R.totExp,la))?tE/trailAvg(R.totExp,la):1},trailing:{sales:tS,cos:tC,totExp:tE,months:MONTHS_S.slice(Math.max(0,la-TRAIL+1),la+1).join("–")}};
   out.sales=mk(sales.actual,pS);out.cos=mk(cos?cos.actual:new Array(12).fill(null),pC);out.totExp=mk(totExp?totExp.actual:new Array(12).fill(null),pE);
   out.gp=mk(gp?gp.actual:sales.actual.map((v,i)=>v!=null&&cos&&cos.actual[i]!=null?v-cos.actual[i]:null),pG);out.net=mk(net?net.actual:new Array(12).fill(null),pN);
-  out.fy={sales:sum(out.sales.display),gp:sum(out.gp.display),totExp:sum(out.totExp.display),net:sum(out.net.display)};
-  out.sheetFy={sales:sum(sales.display),net:net?sum(net.display):null};
+  out.fy={sales:sum(out.sales.display),gp:sum(out.gp.display),totExp:sum(out.totExp.display),net:sum(out.net.display)};out.sheetFy={sales:sum(sales.display),net:net?sum(net.display):null};
   return out;}
-function projectCash(ent){
-  const la=CONFIG.LAST_ACTUAL.cash;const A=STATE.A[ENT_CASH_TAB[ent]];const base=ent==="moon"?LOCKED.cash.noFunding.moon:LOCKED.cash.realistic[ent];if(!A||!A.inflow||!A.outflow||!base)return null;
-  const inflow=split(A.inflow,la),outflow=split(A.outflow,la),closing=A.closing?split(A.closing,la):null;
-  const outAbs=outflow.actual.map(v=>v==null?null:Math.abs(v));
-  const rI=perfRatio(inflow.actual,base.inflow,la),rO=perfRatio(outAbs,base.outflow,la);
-  const pI=MONTHS_S.map((_,m)=>m<=la?null:(base.inflow[m]||0)*rI),pO=MONTHS_S.map((_,m)=>m<=la?null:(base.outflow[m]||0)*rO);
-  const pN=pI.map((v,m)=>v==null?null:v-pO[m]);
-  const startCash=closing&&closing.actual[la]!=null?closing.actual[la]:null;
-  const pClose=new Array(12).fill(null);if(startCash!=null){let c=startCash;for(let m=la+1;m<12;m++){c+=pN[m];pClose[m]=c;}}
-  const mk=(act,proj)=>({actual:act,proj,display:act.map((v,i)=>i<=la?v:proj[i])});
-  const out={ratios:{inflow:rI,outflow:rO},la,inflow:mk(inflow.actual,pI),outflow:mk(outAbs,pO),net:mk(A.net?split(A.net,la).actual:inflow.actual.map((v,i)=>v!=null&&outAbs[i]!=null?v-outAbs[i]:null),pN),closing:mk(closing?closing.actual:new Array(12).fill(null),pClose)};
-  out.cashOut=pClose.findIndex(v=>v!=null&&v<0);if(out.cashOut<0)out.cashOut=null;
-  out.fy={inflow:sum(out.inflow.display),outflow:sum(out.outflow.display),net:sum(out.net.display),closing:pClose[11]!=null?pClose[11]:startCash};
-  return out;}
-
 /* Finance forecast view of cash (option A): the live tab's own forward months, as maintained by Finance */
 function forecastCash(ent){const la=CONFIG.LAST_ACTUAL.cash;const A=STATE.A[ENT_CASH_TAB[ent]];if(!A||!A.closing)return null;
   const closing=split(A.closing,la);let cashOut=null;for(let m=la+1;m<12;m++){if(closing.display[m]!=null&&closing.display[m]<0){cashOut=m;break;}}
@@ -506,7 +496,7 @@ function renderPnlCockpit(){
   <div class="grid">
     <div class="card p0 col8"><div class="chd"><div class="eyebrow">Group revenue · month by month</div><div class="ctitle">Delivered vs realistic vs target, AED</div></div>
       <div class="chartbox tall"><canvas id="ch-hero"></canvas></div></div>
-    <div class="card col4"><div class="eyebrow">FY26 outlook · net earnings${infoIcon("Projected in code, not read from the sheet. Booked actuals through "+MONTHS_S[la]+" from the Group tab; each remaining month = Moontech projection + ITCAN·CPX projection, where each unit's month = its locked realistic plan × its own YTD performance ratio (per line: sales, cost of sales, expenses). Group therefore always equals the sum of the two unit pages.")}</div><div class="big tnum ${signCls(fyNetOut)}">${money(fyNetOut)}</div>
+    <div class="card col4"><div class="eyebrow">FY26 outlook · net earnings${infoIcon("Projected in code, not read from the sheet. Booked actuals through "+MONTHS_S[la]+" from the Group tab; each remaining month = Moontech projection + ITCAN·CPX projection. Each unit: revenue = trailing 3-month run-rate × the locked plan's seasonal shape; cost of sales at the trailing gross margin; opex at its trailing 3-month average, flat. Group therefore always equals the sum of the two unit pages.")}</div><div class="big tnum ${signCls(fyNetOut)}">${money(fyNetOut)}</div>
       <div style="margin:14px 0 4px">
         <div class="statline"><span class="l">Realistic plan (FY)</span><span class="v tnum ${signCls(fyNetR)}">${money(fyNetR)}</span></div>
         <div class="statline"><span class="l">Gap to realistic</span><span class="v">${deltaChip(fyNetOut-fyNetR,true)}</span></div>
@@ -550,7 +540,7 @@ function entityCard(name,ytd,R,gpm,rev,netS,la,groupYtd,sparkId,ent){const W=win
     <div style="margin-top:8px"><div class="statline"><span class="l">Revenue vs realistic ${W.label}</span><span class="v">${deltaChip(ytd!=null?ytd-planY:null,true)}</span></div>
     <div class="statline"><span class="l">Net earnings ${W.label}</span><span class="v tnum ${signCls(netY)}">${money(netY)} ${deltaChip(netY!=null?netY-netPlanY:null,true)}</span></div>
     <div class="statline"><span class="l">Gross margin ${W.label}</span><span class="v tnum">${pct(gpm)}</span></div>
-    <div class="statline"><span class="l">FY outlook (projected)${infoIcon("Booked actuals + remaining months of the locked realistic plan scaled by this unit's YTD performance ratio.")}</span><span class="v tnum">${money(PJe?PJe.fy.sales:null)} <span class="chip n">net ${fK(PJe?PJe.fy.net:null)}</span></span></div>
+    <div class="statline"><span class="l">FY outlook (projected)${infoIcon("Trailing 3-month run-rate × the locked plan's seasonal shape for revenue; trailing gross margin for cost of sales; trailing average opex, flat.")}</span><span class="v tnum">${money(PJe?PJe.fy.sales:null)} <span class="chip n">net ${fK(PJe?PJe.fy.net:null)}</span></span></div>
     <div class="statline"><span class="l">Share of group ${W.label}</span><span class="v tnum">${pct(ytd&&groupYtd?ytd/groupYtd:null)}</span></div></div><div class="spark"><canvas id="${sparkId}"></canvas></div></div>`;}
 
 /* ================================================================
@@ -571,7 +561,7 @@ function renderEntityPnl(pageId,ent,title){
       ${kpiTile(`${W.label} gross profit`,`<span class="${signCls(ytdGp)}">${money(ytdGp)}</span>`,`<span class="chip n">margin ${pct(gpm)}</span>`+deltaChip(ytdGp!=null?ytdGp-sum(R.gp,W.from,W.toA):null,true,fK," vs realistic"),"")}
       ${kpiTile(`${W.label} total expenses`,money(ytdExp),costChip(ytdExp,sum(R.totExp,W.from,W.toA)),"")}
       ${kpiTile(`${W.label} net earnings`,`<span class="${signCls(ytdNet)}">${money(ytdNet)}</span>`,deltaChip(ytdNet!=null?ytdNet-sum(R.net,W.from,W.toA):null,true,fK," vs realistic"),"sp-"+cid+"n")}
-      ${kpiTile("FY26 outlook · revenue / net",`${fK(fyRev)} / <span class="${signCls(fyNet)}">${fK(fyNet)}</span>`,`<span class="chip n">realistic ${fK(sum(R.sales))} / ${fK(sum(R.net))}</span><span class="chip n">target ${fK(sum(T.sales))} / ${fK(sum(T.net))}</span>`,"","",'Booked actuals + remaining months of the locked realistic plan scaled by YTD performance ratio (per line). Not the sheet\'s own forecast.')}
+      ${kpiTile("FY26 outlook · revenue / net",`${fK(fyRev)} / <span class="${signCls(fyNet)}">${fK(fyNet)}</span>`,`<span class="chip n">realistic ${fK(sum(R.sales))} / ${fK(sum(R.net))}</span><span class="chip n">target ${fK(sum(T.sales))} / ${fK(sum(T.net))}</span>`,"","",'Revenue = trailing 3-month run-rate × the locked plan\'s seasonal shape; cost of sales at the trailing gross margin; opex at its trailing 3-month average, flat. GP and net derived. Not the sheet\'s own forecast.')}
     </div></div>
     <div class="card p0 col8"><div class="chd"><div class="eyebrow">${title}</div><div class="ctitle">Revenue vs locked plans, with net earnings</div></div><div class="chartbox tall"><canvas id="ch-${cid}-rev"></canvas></div></div>
     <div class="card p0 col4"><div class="chd"><div class="eyebrow">Composition</div><div class="ctitle">Cost of sales + opex vs revenue</div></div><div class="chartbox tall"><canvas id="ch-${cid}-comp"></canvas></div></div>
@@ -964,7 +954,7 @@ function renderHealth(){
       <p>Baselines are frozen inside this file, not fetched: <code>${esc(L.pnl)}</code> (Realistic and Target, for Group / Moontech / ITCAN+CPX/MARS) and <code>${esc(L.cash)}</code> (Group and ITCAN+CPX realistic; Moontech no-funding and acceleration). Locked on ${esc(L.lockedOn)}. Only the high-level lines are stored: Sales, Cost of sales, Gross profit, Total expenses, Net earnings, and six notable expense lines (payroll, legal &amp; professional, systems, marketing &amp; branding, product development, freelancers); for cash: total inflows, total outflows, net cashflow, opening/closing balance, and the financing rows (VC, loans, loan repayments). Editing the forecast sheets does <b>not</b> move these — re-lock by sending updated workbooks.</p>
       <h3>Actuals</h3><p>Live from the published Google Sheets CSV endpoints on every load. The three Live P&amp;L tabs and three Live cashflow tabs are the only sources of actuals; "Realistic VS Actual" and "Variance" tabs are no longer read. Actuals run January–<b>${MONTHS[CONFIG.LAST_ACTUAL.pnl]}</b> (<code>CONFIG.LAST_ACTUAL</code>, flipped monthly); months after that on a live tab are shown as the sheet's own live forecast, shown in steel (P&amp;L) or grey (cash), and never enter a variance.</p>
       <h3>Booked months</h3><p>P&amp;L: <b>${MONTHS[CONFIG.LAST_ACTUAL.pnl]}</b> — source: ${esc(STATE.laSource?STATE.laSource.pnl:"—")}. Cash: <b>${MONTHS[CONFIG.LAST_ACTUAL.cash]}</b> — source: ${esc(STATE.laSource?STATE.laSource.cash:"—")}. To make this automatic, add one row to the Group live tab of each sheet labelled <code>Status</code> with <code>Actual</code> under every closed month (or a cell reading <code>Actuals through: September</code>); the dashboard reads it on load and the manual switch is never touched again.</p>
-      <h3>Projection (FY outlook)</h3><p>Forecast months are <b>not</b> read from the sheets. Each remaining month = locked realistic plan for that month × YTD performance ratio (booked actual ÷ plan), computed separately for sales, cost of sales and total expenses; gross profit and net earnings are derived. Group P&amp;L projection is bottom-up — the sum of the two unit projections — so the cockpit reconciles to the unit pages by construction. <b>Cash is different by design:</b> forward months come from the cashflow forecast Finance maintains in the live tabs, because a cash forecast carries known commitments (tax, instalments, planned spend) that a run-rate ratio cannot infer. Runway is read from that forecast: the month the closing balance first goes negative.</p>
+      <h3>Projection (FY outlook)</h3><p>Forecast months are <b>not</b> read from the sheets. For each unit: revenue[m] = trailing 3-month actual revenue × (locked plan revenue[m] ÷ locked plan revenue over the same three months) — the recent run-rate as the level, the plan as the seasonal shape; cost of sales = revenue × trailing (CoS ÷ revenue); total expenses = trailing 3-month average, flat; gross profit and net earnings derived. Group P&amp;L projection is bottom-up — the sum of the two unit projections — so the cockpit reconciles to the unit pages by construction. <b>Cash is different by design:</b> forward months come from the cashflow forecast Finance maintains in the live tabs, because a cash forecast carries known commitments (tax, instalments, planned spend) that a run-rate ratio cannot infer. Runway is read from that forecast: the month the closing balance first goes negative.</p>
       <h3>Insights</h3><p>The Insights card on each page is generated in code from the live figures — deterministic rules on variance, margin, momentum, burn and corridor position. It refreshes whenever the sheets do and only ever cites numbers shown on the page. It is not a language model; wiring one in would require a small server-side key holder, which a public GitHub Pages file cannot safely contain.</p>
       <h3>Formulas</h3><p><code>Variance</code> = actual − locked baseline, booked months only; favourable = revenue/profit/inflows/cash up, costs/outflows down. <code>Var %</code> = variance ÷ |baseline|. <code>YTD</code> = sum Jan→last actual (closing balance uses the last actual month's value). <code>FY outlook</code> = actuals + live forecast. <code>Gross margin</code> = GP ÷ revenue (recomputed). <code>Forecast accuracy</code> = 1 − mean(|actual − baseline| ÷ |baseline|). <code>Avg net cash</code> = mean monthly net movement over booked months; <code>Runway</code> = latest closing ÷ |burn|. <code>Deployed (VC)</code> = sum of the VC rows in the Group cashflow (booked months) ÷ AED peg; the quarterly allocation strips still walk the register's reported % through quarters in order. Funding scenarios: see the method note on that page.</p>
       <h3>Verified</h3><p>Locked cash scenarios reconcile exactly (closing = opening + net; net = inflows − outflows, every month). Locked P&amp;L FY totals tie to the workbooks (Realistic 23.0M / Target 38.5M revenue). The live-tab parser was reconciled against the exported P&amp;L to within AED 1.</p></div>
@@ -1095,7 +1085,7 @@ async function boot(){
   initNav();document.getElementById("loader").style.display="none";}
 boot();
 /* expose for debugging / verification */
-window.STATE=STATE;window.CONFIG=CONFIG;window.fK=fK;window.LOCKED=LOCKED;window.win=win;window.projectPnl=projectPnl;window.projectCash=projectCash;window.detectLastActual=detectLastActual;
+window.STATE=STATE;window.CONFIG=CONFIG;window.fK=fK;window.LOCKED=LOCKED;window.win=win;window.projectPnl=projectPnl;window.detectLastActual=detectLastActual;
 
 </script>
 </body>
