@@ -114,6 +114,7 @@ td.heat{font-weight:500}
 .toggle input:checked{background:var(--brand)}.toggle input:checked::after{left:16px}
 /* quarter allocation strip */
 .qstrip{display:inline-grid;grid-template-columns:repeat(5,52px);gap:3px;vertical-align:middle}
+#tbl-vc th:nth-child(4),#tbl-vc td:nth-child(4){padding-left:11px}
 .qcell{height:26px;border-radius:5px;background:var(--line2);font-size:.62rem;font-weight:600;color:var(--faint);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
 .qcell.has{background:var(--blue-wash);color:var(--blue)}
 .qcell.has.done{background:var(--green-lt);color:var(--green)}
@@ -832,6 +833,7 @@ function parseUsage(usage,amount){
   if(out.length===1&&out[0].amt==null)out[0].amt=amount;
   if(out.length>1){const known=out.reduce((a,o)=>a+(o.amt||0),0);const un=out.filter(o=>o.amt==null);if(un.length&&amount!=null)un.forEach(o=>o.amt=(amount-known)/un.length);}
   return out;}
+function tidy(v){if(v==null)return v;const r=Math.round(v/1000)*1000;return Math.abs(v-r)<=5?r:v;}
 function readInvestors(){
   const h=STATE.health.cf_invest;const raw=h&&h.raw;if(!raw)return null;let hdrIdx=-1;raw.forEach((r,i)=>{if(hdrIdx<0&&r.some(c=>/investor name/i.test(c)))hdrIdx=i;});
   const investors=[];if(hdrIdx>=0){for(let i=hdrIdx+1;i<raw.length;i++){const r=raw[i];const name=String(r[0]||"").trim();if(!name)continue;if(/^total/i.test(name))break;
@@ -851,7 +853,7 @@ function renderVC(){
   const el=document.getElementById("pg-vc");const investors=readInvestors();
   if(!investors){el.innerHTML=missingNote("VC Investment","cf_invest");return;}
   const active=investors.filter(v=>!v.cancelled),cancelled=investors.filter(v=>v.cancelled),received=active.filter(v=>v.received);
-  const totCommit=active.reduce((a,v)=>a+(v.amount||0),0),totReceived=received.reduce((a,v)=>a+(v.amount||0),0);
+  const totCommit=tidy(active.reduce((a,v)=>a+(v.amount||0),0)),totReceived=tidy(received.reduce((a,v)=>a+(v.amount||0),0));
   let deployed=0,knownDeploy=0;active.forEach(v=>{if(v.deploy!=null&&v.amount!=null){deployed+=v.amount*(v.deploy/100);knownDeploy+=v.amount;}});
   const byQ={};QUARTERS.forEach(q=>byQ[q]={});active.forEach(v=>v.alloc.forEach(a=>{if(byQ[a.q])byQ[a.q][v.name]=(byQ[a.q][v.name]||0)+(a.amt||0);}));
   const pending=[];active.forEach(v=>{let rem=(v.deploy!=null&&v.amount!=null)?v.amount*(v.deploy/100):null;v.alloc.forEach(a=>{if(!a.amt)return;if(rem!=null){if(rem>=a.amt-1){rem-=a.amt;return;}const left=a.amt-Math.max(rem,0);rem=0;if(a.q===CONFIG.NEXT_Q)pending.push({name:v.name,amt:left});}else if(a.q===CONFIG.NEXT_Q)pending.push({name:v.name,amt:a.amt});});});
@@ -861,14 +863,14 @@ function renderVC(){
   <div class="hrow"><div><h1>VC Investment</h1><div class="psub">Investment Summary · live · USD (AED at ${CONFIG.USD_AED} peg)</div></div></div>
   <div class="grid">
     <div class="col12"><div class="ktiles">
-      ${kpiTile("Total VC raised (received)",`<span title="exact sum of tickets: $${Math.round(totReceived).toLocaleString()}">${money(headline,"$")}</span>`,`<span class="chip g">${received.length} of ${active.length} active investors</span>`,"",`≈ ${money(totAED)}${dep2026!=null?` · of which ${money(dep2026)} deployed in 2026 (per cashflow)`:""}`)}
+      ${kpiTile("Total VC raised (received)",money(headline,"$"),`<span class="chip g">${received.length} of ${active.length} active investors</span>`,"",`≈ ${money(totAED)}${dep2026!=null?` · of which ${money(dep2026)} deployed in 2026 (per cashflow)`:""}`)}
       ${kpiTile("Committed (active)",money(totCommit,"$"),cancelled.length?`<span class="chip n">${cancelled.length} cancelled excluded</span>`:"","")}
       ${kpiTile("Deployed in 2026 (per cashflow)",money(depUSD,"$"),fcVC&&fcVC.tot?`<span class="chip b">+ ${money(fcVC.tot/CONFIG.USD_AED,"$")} forecast ${fcVC.months.join("/")}</span>`:"","",dep2026!=null?`AED ${Math.round(dep2026).toLocaleString()} injected Jan–${MONTHS_S[CONFIG.LAST_ACTUAL.cash]}`:"cashflow VC rows not found",'Sum of the VC rows in the Group cashflow for booked 2026 months, converted at the AED peg. 2026 only — part of the raise was deployed in Q4 2025 and sits in opening cash, so no share of the total is shown here.')}
       ${kpiTile("Pending next quarter · "+CONFIG.NEXT_Q,money(pendingTot,"$"),pending.length?`<span class="chip o">${pending.map(p=>p.name).join(", ")}</span>`:'<span class="chip n">none flagged</span>',"")}
     </div></div>
     <div class="card p0 col7"><div class="chd"><div class="eyebrow">Deployment plan</div><div class="ctitle">Capital allocated by quarter, stacked by investor</div><div class="csub">${CONFIG.NEXT_Q} highlighted as next quarter.</div></div><div class="chartbox"><canvas id="ch-vcq"></canvas></div></div>
     <div class="card p0 col5"><div class="chd"><div class="eyebrow">Who invested</div><div class="ctitle">Ticket sizes</div></div><div class="chartbox"><canvas id="ch-vcw"></canvas></div></div>
-    <div class="card p0 col12"><div class="chd"><div class="eyebrow">Register</div><div class="ctitle">Investor by investor · quarterly allocation</div><div class="csub">Each strip shows where the ticket is allocated. Green = deployed, orange = partly deployed, blue = allocated, dashed = next quarter.</div></div>
+    <div class="card p0 col12"><div class="chd"><div class="eyebrow">Register</div><div class="ctitle">Investor by investor · quarterly allocation</div><div class="csub">Allocation by quarter. Green = deployed, orange = partly deployed, blue = allocated, dashed = next quarter.</div></div>
       <div class="twrap"><table id="tbl-vc"></table></div></div>
   </div>`;
   const names=[...active].sort((a,b)=>(b.amount||0)-(a.amount||0)).map(v=>v.name);
@@ -877,11 +879,11 @@ function renderVC(){
   const sorted=[...active].sort((a,b)=>(b.amount||0)-(a.amount||0));
   mkChart("ch-vcw",{type:"bar",data:{labels:sorted.map(v=>v.name),datasets:[{label:"Ticket",data:sorted.map(v=>v.amount),backgroundColor:sorted.map(v=>v.received?cssVar("--brand"):cssVar("--grey-bar")),borderRadius:5}]},
     options:hOpts({plugins:{legend:{display:false},tooltip:tip(v=>"$"+Math.round(v).toLocaleString())},scales:{x:{ticks:{callback:v=>"$"+fK(v)}}}})});
-  document.getElementById("tbl-vc").innerHTML=`<thead><tr><th>Investor</th><th>Amount</th><th style="text-align:left">Status</th><th style="text-align:left">Allocation <span class="qhead" style="margin-left:6px">${QUARTERS.map(q=>`<span>${q.replace(" 20","'")}</span>`).join("")}</span></th><th>Deployed</th></tr></thead><tbody>`+
+  document.getElementById("tbl-vc").innerHTML=`<thead><tr><th>Investor</th><th>Amount</th><th style="text-align:left">Status</th><th style="text-align:left"><span class="qhead">${QUARTERS.map(q=>`<span>${q.replace(" 20","'")}</span>`).join("")}</span></th><th>Deployed</th></tr></thead><tbody>`+
     investors.map(v=>{const st=v.cancelled?'<span class="chip r">Cancelled</span>':(v.received?'<span class="chip g">Received</span>':`<span class="chip n">${esc(v.status||"—")}</span>`);
       const dp=v.deploy==null?'<span class="chip n">—</span>':(v.deploy>=100?'<span class="chip g">100%</span>':`<span class="chip o">${v.deploy}%</span>`);
       return`<tr${v.cancelled?' class="muted"':''}><td>${esc(v.name)}</td><td class="tnum">${v.amount!=null?"$"+Math.round(v.amount).toLocaleString():"—"}</td><td style="text-align:left">${st}</td><td style="text-align:left">${v.cancelled?'<span class="chip n">—</span>':qStrip(v)}</td><td>${dp}</td></tr>`;}).join("")+
-    (()=>{const qTot=QUARTERS.map(q=>Object.values(byQ[q]).reduce((s,v)=>s+v,0));const allocTot=qTot.reduce((s,v)=>s+v,0);
+    (()=>{const qTot=QUARTERS.map(q=>Object.values(byQ[q]).reduce((s,v)=>s+v,0));const allocTot=tidy(qTot.reduce((s,v)=>s+v,0));
       const strip=`<span class="qstrip">${qTot.map((v,i)=>`<span class="qcell ${v?'has':''}" style="${v?'background:rgba(255,255,255,.14);color:#fff':'background:rgba(255,255,255,.06)'}" title="${QUARTERS[i]}: $${Math.round(v).toLocaleString()}">${v?fK(v):""}</span>`).join("")}</span>`;
       return`<tr class="band"><td>Total (active) · ${active.length} investors</td><td class="tnum">$${Math.round(totCommit).toLocaleString()}</td><td style="text-align:left"><span class="chip g">$${Math.round(totReceived).toLocaleString()} received</span></td><td style="text-align:left">${strip}<div style="font-size:.7rem;font-weight:600;margin-top:4px">${QUARTERS.map((q,i)=>q.replace(" 20","'")+" "+fK(qTot[i])).join(" · ")}</div><div style="font-size:.66rem;font-weight:500;opacity:.8;margin-top:2px">allocated $${Math.round(allocTot).toLocaleString()} · pending ${CONFIG.NEXT_Q} $${Math.round(pendingTot).toLocaleString()}</div></td><td><span class="chip g">$${Math.round(depUSD!=null?depUSD:deployed).toLocaleString()} in 2026</span></td></tr></tbody>`;})();
   mountInsights(el,insightsVC(active,received,depUSD!=null?depUSD:deployed,depUSD!=null?headline:knownDeploy,pending,pendingTot));}
@@ -1026,7 +1028,7 @@ function insightsVariance(rows,ent,scen,isCash){const out=[];const live=rows.fil
 function insightsHybrid(rowsNF,rowsAC,cumPos){const out=[];if(cumPos!=null)out.push(ins("neutral",`Moontech is ${(cumPos*100).toFixed(0)}% of the way to acceleration spending`,cumPos<0.25?"Behaving like the no-funding plan so far.":cumPos<0.75?"Mid-ramp — deploying funds while keeping cover.":"Spending near the acceleration plan."));
   const c=rowsNF.find(r=>r.m.k==="closing"),ca=rowsAC.find(r=>r.m.k==="closing");if(c&&c.varY!=null&&ca)out.push(ins(c.varY>=0?"good":"bad",`Cash ${c.varY>=0?"ahead of":"behind"} no-funding by ${fK(Math.abs(c.varY))}`,`and ${ca.varY>=0?"ahead of":"behind"} acceleration by ${fK(Math.abs(ca.varY||0))}. ${c.varY>=0&&(ca.varY||0)>=0?"Holding more cash than either plan expected — the ramp is funded.":c.varY<0?"Below even the floor plan — cover is the constraint.":"Between the plans, as a hybrid should be."}`));
   const i=rowsNF.find(r=>r.m.k==="inflow");if(i&&i.varY!=null)out.push(ins(i.varY>=0?"good":"bad",`Inflows ${i.varY>=0?"+":"−"}${fK(Math.abs(i.varY))} vs no-funding`,"Collections and funding received against the floor plan."));return out;}
-function insightsVC(active,received,deployed,knownDeploy,pending,pendingTot){const out=[];const rec=received.reduce((s,v)=>s+(v.amount||0),0),com=active.reduce((s,v)=>s+(v.amount||0),0);
+function insightsVC(active,received,deployed,knownDeploy,pending,pendingTot){const out=[];const rec=tidy(received.reduce((s,v)=>s+(v.amount||0),0)),com=tidy(active.reduce((s,v)=>s+(v.amount||0),0));
   out.push(ins(rec>=com?"good":"neutral",`$${Math.round(rec).toLocaleString()} of $${Math.round(com).toLocaleString()} committed has landed`,rec>=com?"Every active ticket is in the bank.":`${active.length-received.length} ticket(s) still outstanding.`));
   out.push(ins("neutral",`$${Math.round(deployed).toLocaleString()} deployed in 2026, per cashflow`,`$${Math.round(pendingTot).toLocaleString()} scheduled for ${CONFIG.NEXT_Q}${pending.length?" ("+pending.map(p=>p.name).join(", ")+")":""}. Earlier deployment (Q4 2025) sits in opening cash and is not counted here.`));
   return out;}
