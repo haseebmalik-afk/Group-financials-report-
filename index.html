@@ -34,6 +34,9 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--i
 .nav a .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.55;flex:none}
 .sfoot{margin-top:auto;padding:12px 10px 0;border-top:1px solid var(--side-line);color:var(--side-foot);font-size:.65rem;line-height:1.5}
 .sfoot b{color:var(--side-txt);font-weight:600}
+.curtoggle{display:inline-flex;border:1px solid var(--side-line);border-radius:999px;padding:2px;background:rgba(255,255,255,.04)}
+.curtoggle button{font:inherit;font-size:.68rem;font-weight:700;letter-spacing:.04em;color:var(--side-foot);background:none;border:none;border-radius:999px;padding:4px 11px;cursor:pointer}
+.curtoggle button.on{background:var(--brand);color:#fff}
 .main{flex:1;max-width:1320px;padding:22px 30px 60px;min-width:0}
 .page{display:none}.page.on{display:block}
 h1{font-size:1.5rem;font-weight:700;letter-spacing:-.02em}
@@ -130,7 +133,8 @@ td.heat{font-weight:500}
 .callout .k{font-size:.68rem;color:var(--muted);font-weight:600}
 .callout .v{font-size:.95rem;font-weight:700;margin-top:2px}
 @media (max-width:1080px){.col9,.col8,.col7,.col6,.col5,.col4,.col3{grid-column:span 12}}
-@media (max-width:900px){.app{flex-direction:column}.side{width:100%;min-width:0;height:auto;position:static;flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px;padding:10px 12px;overflow:visible}.logo{border-bottom:none;padding:0 4px 6px 0;margin:0;width:100%}.ngroup{display:none}.nav{display:flex;flex-wrap:wrap}.sfoot{display:none}.main{padding:16px 14px 50px}}
+#curtoggle2{display:none}
+@media (max-width:900px){#curtoggle2{display:inline-flex}.app{flex-direction:column}.side{width:100%;min-width:0;height:auto;position:static;flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px;padding:10px 12px;overflow:visible}.logo{border-bottom:none;padding:0 4px 6px 0;margin:0;width:100%}.ngroup{display:none}.nav{display:flex;flex-wrap:wrap}.sfoot{display:none}.main{padding:16px 14px 50px}}
 @media (prefers-reduced-motion:reduce){.load .ring{animation:none}}
 </style>
 </head>
@@ -138,7 +142,7 @@ td.heat{font-weight:500}
 <div class="load" id="loader"><div class="ring"></div><p id="loadmsg">Loading…</p></div>
 <div class="app">
   <aside class="side">
-    <div class="logo"><div class="tile">IT</div><div><div class="nm">ITCAN Group</div><div class="sub">Finance · 2026 Live</div></div></div>
+    <div class="logo"><div class="tile">IT</div><div><div class="nm">ITCAN Group</div><div class="sub">Finance · 2026 Live</div></div><div class="curtoggle" id="curtoggle2" style="margin-left:auto"></div></div>
     <nav class="nav" id="nav">
       <div class="ngroup">Overview</div>
       <a href="#pnl-cockpit" class="on"><span class="dot"></span>P&amp;L Cockpit</a>
@@ -158,7 +162,7 @@ td.heat{font-weight:500}
       <div class="ngroup">Reference</div>
       <a href="#health"><span class="dot"></span>Data &amp; Method</a>
     </nav>
-    <div class="sfoot"><div style="margin-top:0">Actuals live from Google Sheets<br>Baselines locked <b id="lockLabel">—</b><br>Actuals through <b id="laLabel">—</b><br>Fetched <span id="lastfetch">—</span></div></div>
+    <div class="sfoot"><div class="curtoggle" id="curtoggle"></div><div style="margin-top:8px">Actuals live from Google Sheets<br>Baselines locked <b id="lockLabel">—</b><br>Actuals through <b id="laLabel">—</b><br>Fetched <span id="lastfetch">—</span></div></div>
   </aside>
   <main class="main">
     <div id="periodbar"></div>
@@ -268,9 +272,12 @@ function dim(colorArr,W){return colorArr.map((c,i)=>(i>=W.from&&i<=W.to)?c:c+"55
 /* ================================================================
    FORMATTERS
    ================================================================ */
-function money(v,cur){if(v==null||isNaN(v))return"—";const s=(cur||"AED")+" "+Math.round(Math.abs(v)).toLocaleString("en-US");return v<0?"-"+s:s;}
-function moneyPlain(v){if(v==null||isNaN(v))return"—";const s=Math.round(Math.abs(v)).toLocaleString("en-US");return v<0?"("+s+")":s;}
-function fK(v){if(v==null||isNaN(v))return"—";const a=Math.abs(v),sg=v<0?"-":"";if(a>=1e6)return sg+(a/1e6).toFixed(1)+"M";if(a>=1e3)return sg+(a/1e3).toFixed(0)+"K";return sg+Math.round(a);}
+function curLabel(){return STATE.cur==="USD"?"$":"AED";}
+function cv(v){return (v==null||isNaN(v))?v:(STATE.cur==="USD"?v/CONFIG.USD_AED:v);}   /* AED → display currency */
+function money(v,cur){if(v==null||isNaN(v))return"—";const x=cur?v:cv(v);const s=(cur||curLabel())+" "+Math.round(Math.abs(x)).toLocaleString("en-US");return x<0?"-"+s:s;}
+function moneyPlain(v){if(v==null||isNaN(v))return"—";const x=cv(v);const s=Math.round(Math.abs(x)).toLocaleString("en-US");return x<0?"("+s+")":s;}
+function fKraw(v){if(v==null||isNaN(v))return"—";const a=Math.abs(v),sg=v<0?"-":"";if(a>=1e6)return sg+(a/1e6).toFixed(1)+"M";if(a>=1e3)return sg+(a/1e3).toFixed(0)+"K";return sg+Math.round(a);}
+function fK(v){return fKraw(cv(v));}
 function pct(v,d=0){return(v==null||isNaN(v)||!isFinite(v))?"—":(v*100).toFixed(d)+"%";}
 function signCls(v){return v==null?"":(v<0?"neg":"pos");}
 function deltaChip(v,goodUp=true,fmt=fK,extra){if(v==null||isNaN(v))return'<span class="chip n">—</span>';const good=goodUp?v>=0:v<=0;const arrow=v>=0?"▲":"▼";return`<span class="chip ${good?'g':'r'}">${arrow} ${fmt(Math.abs(v))}${extra||""}</span>`;}
@@ -282,7 +289,7 @@ function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","
 /* ================================================================
    FETCH LAYER
    ================================================================ */
-const STATE={tabs:{},health:{},charts:{},A:{},period:{mode:"ytd",idx:0},ui:{varEnt:"group",varMetric:"sales",cvEnt:"group",cvBase:"hybrid",scLoanRepay:false,scPreVC:false}};
+const STATE={tabs:{},health:{},charts:{},A:{},period:{mode:"ytd",idx:0},cur:"AED",ui:{varEnt:"group",varMetric:"sales",cvEnt:"group",cvBase:"hybrid",scLoanRepay:false,scPreVC:false}};
 function tabURL(key){const t=CONFIG.TABS[key];return`${t.base==="pnl"?CONFIG.PNL_BASE:CONFIG.CASH_BASE}?gid=${t.gid}&single=true&output=csv`;}
 async function fetchTab(key){
   const url=tabURL(key);const h={key,label:CONFIG.TABS[key].label,url,ok:false,rows:0,layout:"—",anchors:[],missing:[],err:null};
@@ -465,7 +472,7 @@ function varianceRow(kind,scen,ent,m,la){const W=win(la);
   return{m,act,base,v,ytdA,ytdB,varY,varP,fav,hasLive:!!live};}
 function favCls(val,good){if(val==null||Math.abs(val)<0.5)return"";return(good==="up"?val>=0:val<=0)?"fav":"unf";}
 function varTable(rows,la,pal){const W=win(la);
-  return`<table><thead><tr><th>AED</th><th>Actual · ${W.label}</th><th>Baseline</th><th>Variance</th><th>Var %</th><th style="text-align:left;padding-left:18px">Read</th></tr></thead><tbody>${
+  return`<table><thead><tr><th>${curLabel()}</th><th>Actual · ${W.label}</th><th>Baseline</th><th>Variance</th><th>Var %</th><th style="text-align:left;padding-left:18px">Read</th></tr></thead><tbody>${
     rows.map((r,i)=>{const sect=(i===0?'<tr class="sect"><td colspan="6">Headline</td></tr>':(r.m.k==="payroll"?'<tr class="sect"><td colspan="6">Notable expense lines</td></tr>':""));
       const band=r.m.k==="net"?' class="band"':"";const sg=v=>(r.m.k==="outflow"&&v!=null)?-Math.abs(v):v;
       const read=r.fav==null?'<span class="chip n">no data</span>':(r.fav?`<span class="chip g">favourable</span>`:`<span class="chip r">unfavourable</span>`);
@@ -495,7 +502,7 @@ function renderPnlCockpit(){
   el.innerHTML=`
   <div class="hrow"><div><h1>P&amp;L Cockpit</h1><div class="psub">Group 2026 · actuals live · baselines locked <span class="chip b">■ Actual — Jan–${MONTHS_S[la]}</span> <span class="chip f">■ Projected — ${MONTHS_S[la+1]}–Dec</span> <span class="chip n">— Realistic 23M</span> <span class="chip p">— Target 38.5M</span></div></div></div>
   <div class="grid">
-    <div class="card p0 col8"><div class="chd"><div class="eyebrow">Group revenue · month by month</div><div class="ctitle">Delivered vs realistic vs target, AED</div></div>
+    <div class="card p0 col8"><div class="chd"><div class="eyebrow">Group revenue · month by month</div><div class="ctitle">Delivered vs realistic vs target, ${curLabel()}</div></div>
       <div class="chartbox tall"><canvas id="ch-hero"></canvas></div></div>
     <div class="card col4"><div class="eyebrow">FY26 outlook · net earnings${infoIcon("Projected in code, not read from the sheet. Booked actuals through "+MONTHS_S[la]+" from the Group tab; each remaining month = Moontech projection + ITCAN·CPX projection. Each unit: revenue = trailing 3-month run-rate × the locked plan's seasonal shape; cost of sales at the trailing gross margin; opex at its trailing 3-month average, flat. Group therefore always equals the sum of the two unit pages.")}</div><div class="big tnum ${signCls(fyNetOut)}">${money(fyNetOut)}</div>
       <div style="margin:14px 0 4px">
@@ -805,7 +812,7 @@ function renderMoonHybridVariance(el,la){const W=win(la);
       <div style="margin-top:12px"><div class="statline"><span class="l">No-funding outflows ${W.label}</span><span class="v tnum">${money(-sum(NF.outflow,W.from,W.toA))}</span></div><div class="statline"><span class="l">Actual outflows ${W.label}</span><span class="v tnum neg">${money(outS?-Math.abs(sum(outS.actual,W.from,W.toA)||0):null)}</span></div><div class="statline"><span class="l">Acceleration outflows ${W.label}</span><span class="v tnum">${money(-sum(AC.outflow,W.from,W.toA))}</span></div></div></div>
     <div class="card p0 col8"><div class="chd"><div class="eyebrow">Monthly spend ramp</div><div class="ctitle">Outflows: actual inside the no-funding ↔ acceleration corridor</div></div><div class="chartbox"><canvas id="ch-hy-out"></canvas></div></div>
     <div class="card p0 col12"><div class="chd"><div class="eyebrow">Side by side</div><div class="ctitle">Actual vs both locked plans · ${W.label} (closing balance at end ${MONTHS_S[W.toA]})</div><div class="csub">Variance green = favourable. Position: 0% = tracking no-funding, 100% = tracking acceleration.</div></div>
-      <div class="twrap"><table><thead><tr><th>AED</th><th>Actual</th><th>No funding</th><th>Δ vs no funding</th><th>Acceleration</th><th>Δ vs acceleration</th><th style="text-align:left;padding-left:18px">Position in corridor</th></tr></thead><tbody>
+      <div class="twrap"><table><thead><tr><th>${curLabel()}</th><th>Actual</th><th>No funding</th><th>Δ vs no funding</th><th>Acceleration</th><th>Δ vs acceleration</th><th style="text-align:left;padding-left:18px">Position in corridor</th></tr></thead><tbody>
       ${CASH_METRICS.map((m,i)=>{const a=rowsNF[i],b=rowsAC[i];const p=corridorPos(a.ytdA,a.ytdB,b.ytdB);const sg=v=>m.k==="outflow"&&v!=null?-Math.abs(v):v;
         return`<tr${m.k==="net"?' class="band"':""}><td>${m.label}${m.noSum?"":" · "+W.label}</td><td class="tnum">${moneyPlain(sg(a.ytdA))}</td><td class="tnum">${moneyPlain(sg(a.ytdB))}</td><td class="tnum ${m.k==="net"?"":favCls(a.varY,m.good)}">${moneyPlain(a.varY)}</td><td class="tnum">${moneyPlain(sg(b.ytdB))}</td><td class="tnum ${m.k==="net"?"":favCls(b.varY,m.good)}">${moneyPlain(b.varY)}</td><td style="text-align:left;padding-left:18px;min-width:220px">${p==null?"—":`<span class="tnum" style="font-weight:600;margin-right:8px">${(p*100).toFixed(0)}%</span>${corridorBar(p)}`}</td></tr>`;}).join("")}
       </tbody></table></div></div>
@@ -848,7 +855,7 @@ function qStrip(v){
   let remainingDeployed=(v.deploy!=null&&v.amount!=null)?v.amount*(v.deploy/100):null;
   return`<span class="qstrip">${QUARTERS.map(q=>{const a=v.alloc.find(x=>x.q===q);if(!a||!a.amt)return`<span class="qcell"></span>`;
     let cls="has";if(remainingDeployed!=null){if(remainingDeployed>=a.amt-1){cls+=" done";remainingDeployed-=a.amt;}else if(remainingDeployed>0){cls+=" part";remainingDeployed=0;}}
-    if(q===CONFIG.NEXT_Q&&!cls.includes("done"))cls+=" next";return`<span class="qcell ${cls}" title="${q}: $${Math.round(a.amt).toLocaleString()}">${fK(a.amt).replace("K","K")}</span>`;}).join("")}</span>`;}
+    if(q===CONFIG.NEXT_Q&&!cls.includes("done"))cls+=" next";return`<span class="qcell ${cls}" title="${q}: $${Math.round(a.amt).toLocaleString()}">${fKraw(a.amt)}</span>`;}).join("")}</span>`;}
 function renderVC(){
   const el=document.getElementById("pg-vc");const investors=readInvestors();
   if(!investors){el.innerHTML=missingNote("VC Investment","cf_invest");return;}
@@ -865,7 +872,7 @@ function renderVC(){
     <div class="col12"><div class="ktiles">
       ${kpiTile("Total VC raised (received)",money(headline,"$"),`<span class="chip g">${received.length} of ${active.length} active investors</span>`,"",`≈ ${money(totAED)}${dep2026!=null?` · of which ${money(dep2026)} deployed in 2026 (per cashflow)`:""}`)}
       ${kpiTile("Committed (active)",money(totCommit,"$"),cancelled.length?`<span class="chip n">${cancelled.length} cancelled excluded</span>`:"","")}
-      ${kpiTile("Deployed in 2026 (per cashflow)",money(depUSD,"$"),fcVC&&fcVC.tot?`<span class="chip b">+ ${money(fcVC.tot/CONFIG.USD_AED,"$")} forecast ${fcVC.months.join("/")}</span>`:"","",dep2026!=null?`AED ${Math.round(dep2026).toLocaleString()} injected Jan–${MONTHS_S[CONFIG.LAST_ACTUAL.cash]}`:"cashflow VC rows not found",'Sum of the VC rows in the Group cashflow for booked 2026 months, converted at the AED peg. 2026 only — part of the raise was deployed in Q4 2025 and sits in opening cash, so no share of the total is shown here.')}
+      ${kpiTile("Deployed in 2026 (per cashflow)",money(depUSD,"$"),fcVC&&fcVC.tot?`<span class="chip b">+ ${money(fcVC.tot/CONFIG.USD_AED,"$")} forecast ${fcVC.months.join("/")}</span>`:"","",dep2026!=null?`${money(dep2026)} injected Jan–${MONTHS_S[CONFIG.LAST_ACTUAL.cash]}`:"cashflow VC rows not found",'Sum of the VC rows in the Group cashflow for booked 2026 months, converted at the AED peg. 2026 only — part of the raise was deployed in Q4 2025 and sits in opening cash, so no share of the total is shown here.')}
       ${kpiTile("Pending next quarter · "+CONFIG.NEXT_Q,money(pendingTot,"$"),pending.length?`<span class="chip o">${pending.map(p=>p.name).join(", ")}</span>`:'<span class="chip n">none flagged</span>',"")}
     </div></div>
     <div class="card p0 col7"><div class="chd"><div class="eyebrow">Deployment plan</div><div class="ctitle">Capital allocated by quarter, stacked by investor</div><div class="csub">${CONFIG.NEXT_Q} highlighted as next quarter.</div></div><div class="chartbox"><canvas id="ch-vcq"></canvas></div></div>
@@ -875,17 +882,17 @@ function renderVC(){
   </div>`;
   const names=[...active].sort((a,b)=>(b.amount||0)-(a.amount||0)).map(v=>v.name);
   mkChart("ch-vcq",{type:"bar",data:{labels:QUARTERS,datasets:names.map((n,i)=>({label:n,data:QUARTERS.map(q=>byQ[q][n]||null),backgroundColor:palette[i%palette.length],stack:"q",borderRadius:3}))},
-    options:baseOpts({plugins:{tooltip:deepMerge(tip(v=>"$"+Math.round(v).toLocaleString()),{filter:item=>item.parsed.y!=null&&item.parsed.y>0,callbacks:{footer:items=>"Quarter total: $"+Math.round(items.reduce((s,i)=>s+(i.parsed.y||0),0)).toLocaleString()}})},scales:{x:{stacked:true,ticks:{color:QUARTERS.map(q=>q===CONFIG.NEXT_Q?cssVar("--brand"):cssVar("--muted"))}},y:{stacked:true,ticks:{callback:v=>"$"+fK(v)}}}})});
+    options:baseOpts({plugins:{tooltip:deepMerge(tip(v=>"$"+Math.round(v).toLocaleString()),{filter:item=>item.parsed.y!=null&&item.parsed.y>0,callbacks:{footer:items=>"Quarter total: $"+Math.round(items.reduce((s,i)=>s+(i.parsed.y||0),0)).toLocaleString()}})},scales:{x:{stacked:true,ticks:{color:QUARTERS.map(q=>q===CONFIG.NEXT_Q?cssVar("--brand"):cssVar("--muted"))}},y:{stacked:true,ticks:{callback:v=>"$"+fKraw(v)}}}})});
   const sorted=[...active].sort((a,b)=>(b.amount||0)-(a.amount||0));
   mkChart("ch-vcw",{type:"bar",data:{labels:sorted.map(v=>v.name),datasets:[{label:"Ticket",data:sorted.map(v=>v.amount),backgroundColor:sorted.map(v=>v.received?cssVar("--brand"):cssVar("--grey-bar")),borderRadius:5}]},
-    options:hOpts({plugins:{legend:{display:false},tooltip:tip(v=>"$"+Math.round(v).toLocaleString())},scales:{x:{ticks:{callback:v=>"$"+fK(v)}}}})});
+    options:hOpts({plugins:{legend:{display:false},tooltip:tip(v=>"$"+Math.round(v).toLocaleString())},scales:{x:{ticks:{callback:v=>"$"+fKraw(v)}}}})});
   document.getElementById("tbl-vc").innerHTML=`<thead><tr><th>Investor</th><th>Amount</th><th style="text-align:left">Status</th><th style="text-align:left"><span class="qhead">${QUARTERS.map(q=>`<span>${q.replace(" 20","'")}</span>`).join("")}</span></th><th>Deployed</th></tr></thead><tbody>`+
     investors.map(v=>{const st=v.cancelled?'<span class="chip r">Cancelled</span>':(v.received?'<span class="chip g">Received</span>':`<span class="chip n">${esc(v.status||"—")}</span>`);
       const dp=v.deploy==null?'<span class="chip n">—</span>':(v.deploy>=100?'<span class="chip g">100%</span>':`<span class="chip o">${v.deploy}%</span>`);
       return`<tr${v.cancelled?' class="muted"':''}><td>${esc(v.name)}</td><td class="tnum">${v.amount!=null?"$"+Math.round(v.amount).toLocaleString():"—"}</td><td style="text-align:left">${st}</td><td style="text-align:left">${v.cancelled?'<span class="chip n">—</span>':qStrip(v)}</td><td>${dp}</td></tr>`;}).join("")+
     (()=>{const qTot=QUARTERS.map(q=>Object.values(byQ[q]).reduce((s,v)=>s+v,0));const allocTot=tidy(qTot.reduce((s,v)=>s+v,0));
-      const strip=`<span class="qstrip">${qTot.map((v,i)=>`<span class="qcell ${v?'has':''}" style="${v?'background:rgba(255,255,255,.14);color:#fff':'background:rgba(255,255,255,.06)'}" title="${QUARTERS[i]}: $${Math.round(v).toLocaleString()}">${v?fK(v):""}</span>`).join("")}</span>`;
-      return`<tr class="band"><td>Total (active) · ${active.length} investors</td><td class="tnum">$${Math.round(totCommit).toLocaleString()}</td><td style="text-align:left"><span class="chip g">$${Math.round(totReceived).toLocaleString()} received</span></td><td style="text-align:left">${strip}<div style="font-size:.7rem;font-weight:600;margin-top:4px">${QUARTERS.map((q,i)=>q.replace(" 20","'")+" "+fK(qTot[i])).join(" · ")}</div><div style="font-size:.66rem;font-weight:500;opacity:.8;margin-top:2px">allocated $${Math.round(allocTot).toLocaleString()} · pending ${CONFIG.NEXT_Q} $${Math.round(pendingTot).toLocaleString()}</div></td><td><span class="chip g">$${Math.round(depUSD!=null?depUSD:deployed).toLocaleString()} in 2026</span></td></tr></tbody>`;})();
+      const strip=`<span class="qstrip">${qTot.map((v,i)=>`<span class="qcell ${v?'has':''}" style="${v?'background:rgba(255,255,255,.14);color:#fff':'background:rgba(255,255,255,.06)'}" title="${QUARTERS[i]}: $${Math.round(v).toLocaleString()}">${v?fKraw(v):""}</span>`).join("")}</span>`;
+      return`<tr class="band"><td>Total (active) · ${active.length} investors</td><td class="tnum">$${Math.round(totCommit).toLocaleString()}</td><td style="text-align:left"><span class="chip g">$${Math.round(totReceived).toLocaleString()} received</span></td><td style="text-align:left">${strip}<div style="font-size:.7rem;font-weight:600;margin-top:4px">${QUARTERS.map((q,i)=>q.replace(" 20","'")+" "+fKraw(qTot[i])).join(" · ")}</div><div style="font-size:.66rem;font-weight:500;opacity:.8;margin-top:2px">allocated $${Math.round(allocTot).toLocaleString()} · pending ${CONFIG.NEXT_Q} $${Math.round(pendingTot).toLocaleString()}</div></td><td><span class="chip g">$${Math.round(depUSD!=null?depUSD:deployed).toLocaleString()} in 2026</span></td></tr></tbody>`;})();
   mountInsights(el,insightsVC(active,received,depUSD!=null?depUSD:deployed,depUSD!=null?headline:knownDeploy,pending,pendingTot));}
 
 /* ================================================================
@@ -911,7 +918,7 @@ function renderScenarios(){
   const ye=arr=>arr?arr[11]:null;
   if(!g){el.innerHTML=`<h1>Funding Scenarios</h1><div class="note">The Group cashflow tab didn't parse — see Data &amp; Method.</div>`;return;}
   el.innerHTML=`
-  <div class="hrow"><div><h1>Funding Scenarios</h1><div class="psub">The live cash path (booked + Finance forecast) with the funding actually received taken back out · closing balance, AED</div></div></div>
+  <div class="hrow"><div><h1>Funding Scenarios</h1><div class="psub">The live cash path (booked + Finance forecast) with the funding actually received taken back out · closing balance, ${curLabel()}</div></div></div>
   <div class="grid">
     <div class="col12"><div class="ktiles">
       ${kpiTile("Total VC raised",money(headline,"$"),'<span class="chip n">Investment Summary</span>',"",`≈ ${money(vcAED)}`)}
@@ -958,6 +965,7 @@ function renderHealth(){
       <h3>Booked months</h3><p>P&amp;L: <b>${MONTHS[CONFIG.LAST_ACTUAL.pnl]}</b> — source: ${esc(STATE.laSource?STATE.laSource.pnl:"—")}. Cash: <b>${MONTHS[CONFIG.LAST_ACTUAL.cash]}</b> — source: ${esc(STATE.laSource?STATE.laSource.cash:"—")}. To make this automatic, add one row to the Group live tab of each sheet labelled <code>Status</code> with <code>Actual</code> under every closed month (or a cell reading <code>Actuals through: September</code>); the dashboard reads it on load and the manual switch is never touched again.</p>
       <h3>Projection (FY outlook)</h3><p>Forecast months are <b>not</b> read from the sheets. For each unit: revenue[m] = trailing 3-month actual revenue × (locked plan revenue[m] ÷ locked plan revenue over the same three months) — the recent run-rate as the level, the plan as the seasonal shape; cost of sales = revenue × trailing (CoS ÷ revenue); total expenses = trailing 3-month average, flat; gross profit and net earnings derived. Group P&amp;L projection is bottom-up — the sum of the two unit projections — so the cockpit reconciles to the unit pages by construction. <b>Cash is different by design:</b> forward months come from the cashflow forecast Finance maintains in the live tabs, because a cash forecast carries known commitments (tax, instalments, planned spend) that a run-rate ratio cannot infer. Runway is read from that forecast: the month the closing balance first goes negative.</p>
       <h3>Insights</h3><p>The Insights card on each page is generated in code from the live figures — deterministic rules on variance, margin, momentum, burn and corridor position. It refreshes whenever the sheets do and only ever cites numbers shown on the page. It is not a language model; wiring one in would require a small server-side key holder, which a public GitHub Pages file cannot safely contain.</p>
+      <h3>Currency</h3><p>All sheet figures are AED. The sidebar toggle shows them in USD at the peg of 1 USD = 3.6725 AED; it is a display conversion only. Figures that are natively USD (the VC register) are never converted.</p>
       <h3>Formulas</h3><p><code>Variance</code> = actual − locked baseline, booked months only; favourable = revenue/profit/inflows/cash up, costs/outflows down. <code>Var %</code> = variance ÷ |baseline|. <code>YTD</code> = sum Jan→last actual (closing balance uses the last actual month's value). <code>FY outlook</code> = actuals + live forecast. <code>Gross margin</code> = GP ÷ revenue (recomputed). <code>Forecast accuracy</code> = 1 − mean(|actual − baseline| ÷ |baseline|). <code>Avg net cash</code> = mean monthly net movement over booked months; <code>Runway</code> = latest closing ÷ |burn|. <code>Deployed (VC)</code> = sum of the VC rows in the Group cashflow (booked months) ÷ AED peg; the quarterly allocation strips still walk the register's reported % through quarters in order. Funding scenarios: see the method note on that page.</p>
       <h3>Verified</h3><p>Locked cash scenarios reconcile exactly (closing = opening + net; net = inflows − outflows, every month). Locked P&amp;L FY totals tie to the workbooks (Realistic 23.0M / Target 38.5M revenue). The live-tab parser was reconciled against the exported P&amp;L to within AED 1.</p></div>
   </div>`;}
@@ -1057,6 +1065,11 @@ function renderPeriodBar(){
   host.innerHTML=`<div class="pbar"><span class="lbl">Period</span>${pills([{k:"month",label:"Month"},{k:"quarter",label:"Quarter"},{k:"ytd",label:"Year to date"}],p.mode,"pmode")}${sub}<span class="chip n" style="margin-left:auto">${W.isYTD?"Jan–"+MONTHS_S[la]:(W.from===W.toA?MONTHS[W.from]:MONTHS_S[W.from]+"–"+MONTHS_S[W.toA])} · booked through ${MONTHS_S[la]}</span></div>`;
   bindPills(host,"pmode",v=>{STATE.period.mode=v;if(v==="month")STATE.period.idx=la;if(v==="quarter")STATE.period.idx=Math.floor(la/3);rerenderAll();});
   bindPills(host,"pidx",v=>{STATE.period.idx=parseInt(v,10);rerenderAll();});}
+function initCurrency(){try{const c=localStorage.getItem("itcan-cur");if(c==="USD"||c==="AED")STATE.cur=c;}catch(e){}
+  const hosts=["curtoggle","curtoggle2"].map(id=>document.getElementById(id)).filter(Boolean);
+  const draw=()=>hosts.forEach(hst=>{hst.innerHTML=["AED","USD"].map(c=>`<button class="${STATE.cur===c?'on':''}" data-cur="${c}" title="${c==="USD"?"Show AED figures in USD at 3.6725":"Show figures in AED"}">${c}</button>`).join("");
+    hst.querySelectorAll("[data-cur]").forEach(b=>b.addEventListener("click",()=>{STATE.cur=b.getAttribute("data-cur");try{localStorage.setItem("itcan-cur",STATE.cur);}catch(e){}draw();rerenderAll();}));});
+  draw();}
 function rerenderAll(){renderPeriodBar();if(STATE.renderers)STATE.renderers.forEach(([n,f])=>{try{f();}catch(e){console.error(n,e);}});}
 
 /* ================================================================
@@ -1083,7 +1096,7 @@ async function boot(){
   const R=[["cockpit",renderPnlCockpit],["moon",()=>renderEntityPnl("pg-pnl-moontech","moon","Moontech P&L")],["cpx",()=>renderEntityPnl("pg-pnl-cpx","cpx","ITCAN · CPX/MARS P&L")],
     ["varR",()=>renderPnlVariance("pg-var-realistic","realistic")],["varT",()=>renderPnlVariance("pg-var-target","target")],["cashc",renderCashCockpit],
     ["mcash",()=>renderEntityCash("pg-cash-moontech","moon","Moontech Cashflow")],["ccash",()=>renderEntityCash("pg-cash-cpx","cpx","ITCAN · CPX Cashflow")],["cashvar",renderCashVariance],["vc",renderVC],["sc",renderScenarios],["health",renderHealth]];
-  STATE.renderers=R;renderPeriodBar();R.forEach(([n,f])=>{try{f();}catch(e){console.error(n,e);}});
+  STATE.renderers=R;initCurrency();renderPeriodBar();R.forEach(([n,f])=>{try{f();}catch(e){console.error(n,e);}});
   initNav();document.getElementById("loader").style.display="none";}
 boot();
 /* expose for debugging / verification */
