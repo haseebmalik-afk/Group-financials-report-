@@ -881,7 +881,7 @@ function renderVC(){
   const byQ={};QUARTERS.forEach(q=>byQ[q]={});active.forEach(v=>v.alloc.forEach(a=>{if(byQ[a.q])byQ[a.q][v.name]=(byQ[a.q][v.name]||0)+(a.amt||0);}));
   const qTotal=q=>Object.values(byQ[q]||{}).reduce((s,v)=>s+v,0);
   const allocTot=tidy(QUARTERS.reduce((s,q)=>s+qTotal(q),0));
-  const committedYear=tidy(QUARTERS.filter(q=>q.endsWith(String(YEAR))).reduce((s,q)=>s+qTotal(q),0));
+  const committedYear=tidy(QUARTERS.filter(q=>parseInt(q.slice(-4),10)<=YEAR).reduce((s,q)=>s+qTotal(q),0));
   const freeFunds=headline-allocTot;
   const nextQ=CONFIG.NEXT_Q;const nextQPlan=tidy(qTotal(nextQ));const nextQWho=Object.entries(byQ[nextQ]||{}).filter(([,v])=>v>0).map(([n,v])=>`${n} ${fKraw(v)}`);
   const deployedPlan=tidy(active.reduce((s,v)=>s+v.alloc.reduce((t,a)=>t+(a.done||0),0),0));
@@ -891,7 +891,7 @@ function renderVC(){
   <div class="grid">
     <div class="col12"><div class="ktiles">
       ${kpiTile("Total VC raised (received)",money(headline,"$"),`<span class="chip g">${received.length} of ${active.length} active investors</span>`,"",`≈ ${money(totAED)}`)}
-      ${kpiTile("Committed · "+YEAR,money(committedYear,"$"),cancelled.length?`<span class="chip n">${cancelled.length} cancelled excluded</span>`:"","",`all usage allocated to ${YEAR} quarters`,'Sum of every quarterly allocation in the Investment Summary usage column that falls in '+YEAR+'. Allocations to later years are excluded.')}
+      ${kpiTile("Committed · to end "+YEAR,money(committedYear,"$"),cancelled.length?`<span class="chip n">${cancelled.length} cancelled excluded</span>`:"","",`all usage allocated to quarters up to Q4 ${YEAR}`,'Sum of every quarterly allocation in the Investment Summary usage column dated '+YEAR+' or earlier (Q4 2025 included). Allocations to later years are excluded.')}
       ${kpiTile("Free funds",money(freeFunds,"$"),`<span class="chip ${freeFunds>0?'b':'n'}">unallocated</span>`,"",`raised ${money(headline,"$")} − allocated ${money(allocTot,"$")}`,'Allocated funds: total raised minus everything allocated to a quarter in the usage column, any year. What is still free to plan.')}
       ${kpiTile("Planned · "+nextQ,money(nextQPlan,"$"),nextQWho.length?`<span class="chip o">${nextQWho.join(" · ")}</span>`:'<span class="chip n">nothing planned</span>',"","",'Everything the usage column allocates to '+nextQ+', deployed or not.')}
     </div></div>
@@ -1059,7 +1059,7 @@ function insightsHybrid(rowsNF,rowsAC,cumPos){const out=[];if(cumPos!=null)out.p
   const i=rowsNF.find(r=>r.m.k==="inflow");if(i&&i.varY!=null)out.push(ins(i.varY>=0?"good":"bad",`Inflows ${i.varY>=0?"+":"−"}${fK(Math.abs(i.varY))} vs no-funding`,"Collections and funding received against the floor plan."));return out;}
 function insightsVC(active,received,headline,committedYear,allocTot,freeFunds,nextQ,nextQPlan,deployedPlan){const out=[];const rec=tidy(received.reduce((s,v)=>s+(v.amount||0),0));
   out.push(ins(rec>=headline?"good":"neutral",`$${Math.round(rec).toLocaleString()} of $${Math.round(headline).toLocaleString()} raised has landed`,rec>=headline?"Every active ticket is in the bank.":`${active.length-received.length} ticket(s) still outstanding.`));
-  out.push(ins("neutral",`$${Math.round(deployedPlan).toLocaleString()} deployed against the usage plan`,`$${Math.round(committedYear).toLocaleString()} committed to 2026 quarters; $${Math.round(nextQPlan).toLocaleString()} planned for ${nextQ}.`));
+  out.push(ins("neutral",`$${Math.round(deployedPlan).toLocaleString()} deployed against the usage plan`,`$${Math.round(committedYear).toLocaleString()} committed through end 2026; $${Math.round(nextQPlan).toLocaleString()} planned for ${nextQ}.`));
   out.push(ins(freeFunds>0?"good":"neutral",`$${Math.round(freeFunds).toLocaleString()} free funds`,freeFunds>0?`Raised but not yet allocated to any quarter in the usage plan.`:`The whole raise is allocated ($${Math.round(allocTot).toLocaleString()}).`));
   return out;}
 function insightsScenarios(g,m,c,vcAED,vc2026,loan2026){const out=[];const co=arr=>arr?cashOutMonth(arr):null;
