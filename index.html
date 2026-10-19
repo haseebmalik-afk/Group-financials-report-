@@ -121,8 +121,8 @@ td.heat{font-weight:500}
 .qcell{height:26px;border-radius:5px;background:var(--line2);font-size:.62rem;font-weight:600;color:var(--faint);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
 .qcell.has{background:var(--blue-wash);color:var(--blue)}
 .qcell.has.done{background:var(--green-lt);color:var(--green)}
-.qcell.has.part{background:var(--brand-wash);color:var(--brand)}
-.qcell.has.next{outline:1.5px dashed var(--brand);outline-offset:-1.5px}
+.qcell.has.part{background:var(--brand-wash);color:var(--brand)}.qcell small{font-size:.52rem;opacity:.75;margin-left:1px}
+.qcell.has.next{background:var(--card);color:var(--muted);outline:1.5px dashed var(--faint);outline-offset:-1.5px}
 .qhead{display:inline-grid;grid-template-columns:repeat(5,52px);gap:3px;font-size:.6rem;color:var(--faint);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 .qhead span{text-align:center}
 .corr{position:relative;height:8px;border-radius:999px;background:linear-gradient(90deg,var(--line2),var(--brand-lt));margin-top:6px}
@@ -833,67 +833,88 @@ function renderMoonHybridVariance(el,la){const W=win(la);
 /* ================================================================
    PAGE: VC INVESTMENT
    ================================================================ */
-const QUARTERS=["Q4 2025","Q1 2026","Q2 2026","Q3 2026","Q4 2026"];
+/* ---------- VC: usage-driven quarter axis (any year), status-coloured cells ---------- */
+function qKey(q){const m=q.match(/Q([1-4]) (\d{4})/);return m?parseInt(m[2],10)*4+parseInt(m[1],10)-1:0;}
+function qShort(q){return q.replace(" 20","'");}
 function parseUsage(usage,amount){
-  if(!usage)return[];const s=String(usage);const parts=s.split(/,/);const out=[];let defaultYear=null;const ym=s.match(/20\d\d/g);if(ym)defaultYear=ym[ym.length-1];
-  parts.forEach(p=>{const qm=p.match(/Q\s*([1-4])/i);if(!qm)return;const yq=p.match(/20\d\d/);const am=p.match(/([\d.]+)\s*[Kk]/);out.push({q:"Q"+qm[1]+" "+(yq?yq[0]:(defaultYear||"")),amt:am?parseFloat(am[1])*1000:null});});
+  if(!usage)return[];const s=String(usage).replace(/\s+/g," ").trim();const parts=s.split(/,/);const out=[];
+  const years=s.match(/20\d\d/g);const defaultYear=years?years[years.length-1]:null;
+  parts.forEach(p=>{const qm=p.match(/Q\s*([1-4])/i);if(!qm)return;const yq=p.match(/20\d\d/);const am=p.match(/([\d.]+)\s*[Kk]/);
+    out.push({q:"Q"+qm[1]+" "+(yq?yq[0]:(defaultYear||"")),amt:am?Math.round(parseFloat(am[1])*1000):null});});
   if(out.length===1&&out[0].amt==null)out[0].amt=amount;
   if(out.length>1){const known=out.reduce((a,o)=>a+(o.amt||0),0);const un=out.filter(o=>o.amt==null);if(un.length&&amount!=null)un.forEach(o=>o.amt=(amount-known)/un.length);}
   return out;}
-function tidy(v){if(v==null)return v;const r=Math.round(v/1000)*1000;return Math.abs(v-r)<=5?r:v;}
+function tidy(v){if(v==null)return v;const r=Math.round(v/500)*500;return Math.abs(v-r)<=10?r:v;}
 function readInvestors(){
   const h=STATE.health.cf_invest;const raw=h&&h.raw;if(!raw)return null;let hdrIdx=-1;raw.forEach((r,i)=>{if(hdrIdx<0&&r.some(c=>/investor name/i.test(c)))hdrIdx=i;});
   const investors=[];if(hdrIdx>=0){for(let i=hdrIdx+1;i<raw.length;i++){const r=raw[i];const name=String(r[0]||"").trim();if(!name)continue;if(/^total/i.test(name))break;
     investors.push({name,amount:num(r[1]),status:String(r[2]||"").trim(),usage:String(r[3]||"").trim(),deploy:num(r[4])});}}
-  investors.forEach(v=>{v.cancelled=/cancel/i.test(v.status);v.received=/transferred|received/i.test(v.status);v.alloc=parseUsage(v.usage,v.amount);});
+  investors.forEach(v=>{v.cancelled=/cancel/i.test(v.status);v.received=/transferred|received/i.test(v.status);v.alloc=parseUsage(v.usage,v.amount);
+    /* walk the reported deployment % through the allocation in quarter order: done / part / none */
+    let rem=(v.deploy!=null&&v.amount!=null)?v.amount*(v.deploy/100):0;
+    v.alloc.sort((a,b)=>qKey(a.q)-qKey(b.q)).forEach(a=>{if(!a.amt){a.state="none";a.done=0;return;}
+      if(rem>=a.amt-1){a.state="done";a.done=a.amt;rem-=a.amt;}else if(rem>=1000){a.state="part";a.done=rem;rem=0;}else{a.state="none";a.done=0;rem=0;}});});
   let sheetTotal=null;raw.forEach(r=>{if(/^total/i.test(String(r[0]||"").trim())&&num(r[1])!=null)sheetTotal=num(r[1]);});investors.sheetTotal=sheetTotal;
+  /* quarter axis = every quarter mentioned in column D, in order */
+  const qs=new Set();investors.forEach(v=>v.alloc.forEach(a=>{if(/\d{4}/.test(a.q))qs.add(a.q);}));
+  investors.quarters=[...qs].sort((a,b)=>qKey(a)-qKey(b));
   return investors;}
 function vcCash2026(){const A=STATE.A.cf_group;if(!A||!A.vcLines||!A.vcLines.length)return null;const la=CONFIG.LAST_ACTUAL.cash;return sum(A.vcLines.map(r=>sum(r.f,0,la)||0));}
 function vcCashForecast(){const A=STATE.A.cf_group;if(!A||!A.vcLines||!A.vcLines.length)return null;const la=CONFIG.LAST_ACTUAL.cash;const months=[];let tot=0;A.vcLines.forEach(r=>{for(let m=la+1;m<12;m++)if(r.f[m]){tot+=r.f[m];if(!months.includes(MONTHS_S[m]))months.push(MONTHS_S[m]);}});return{tot,months};}
-function qStrip(v){
-  /* deployment status walks quarters in order: earlier quarters are done first */
-  let remainingDeployed=(v.deploy!=null&&v.amount!=null)?v.amount*(v.deploy/100):null;
-  return`<span class="qstrip">${QUARTERS.map(q=>{const a=v.alloc.find(x=>x.q===q);if(!a||!a.amt)return`<span class="qcell"></span>`;
-    let cls="has";if(remainingDeployed!=null){if(remainingDeployed>=a.amt-1){cls+=" done";remainingDeployed-=a.amt;}else if(remainingDeployed>0){cls+=" part";remainingDeployed=0;}}
-    if(q===CONFIG.NEXT_Q&&!cls.includes("done"))cls+=" next";return`<span class="qcell ${cls}" title="${q}: $${Math.round(a.amt).toLocaleString()}">${fKraw(a.amt)}</span>`;}).join("")}</span>`;}
+function qCell(a,q){
+  if(!a||!a.amt)return`<span class="qcell"></span>`;
+  if(a.state==="done")return`<span class="qcell has done" title="${q}: $${Math.round(a.amt).toLocaleString()} deployed">${fKraw(a.amt)}</span>`;
+  if(a.state==="part"){const left=a.amt-a.done;return`<span class="qcell has part" title="${q}: $${Math.round(a.done).toLocaleString()} deployed of $${Math.round(a.amt).toLocaleString()}">${fKraw(a.done)}<small>/${fKraw(a.amt)}</small></span>`;}
+  return`<span class="qcell has next" title="${q}: $${Math.round(a.amt).toLocaleString()} planned, not yet deployed">${fKraw(a.amt)}</span>`;}
+function qStrip(v,QUARTERS){
+  /* an investor whose allocation is split across the quarter boundary (e.g. 65% deployed in Q4'26, 35% in Q1'27) gets the
+     deployed slice green in the earlier quarter and the remainder dashed in the next, so the strip reads as the plan does */
+  return`<span class="qstrip" style="grid-template-columns:repeat(${QUARTERS.length},52px)">${QUARTERS.map(q=>qCell(v.alloc.find(x=>x.q===q),q)).join("")}</span>`;}
 function renderVC(){
   const el=document.getElementById("pg-vc");const investors=readInvestors();
   if(!investors){el.innerHTML=missingNote("VC Investment","cf_invest");return;}
+  const QUARTERS=investors.quarters;const YEAR=2026;
   const active=investors.filter(v=>!v.cancelled),cancelled=investors.filter(v=>v.cancelled),received=active.filter(v=>v.received);
-  const totCommit=tidy(active.reduce((a,v)=>a+(v.amount||0),0)),totReceived=tidy(received.reduce((a,v)=>a+(v.amount||0),0));
-  let deployed=0,knownDeploy=0;active.forEach(v=>{if(v.deploy!=null&&v.amount!=null){deployed+=v.amount*(v.deploy/100);knownDeploy+=v.amount;}});
+  const totReceived=tidy(received.reduce((a,v)=>a+(v.amount||0),0));
+  const headline=investors.sheetTotal!=null?investors.sheetTotal:totReceived;const totAED=headline*CONFIG.USD_AED;
+  /* usage-plan aggregates */
   const byQ={};QUARTERS.forEach(q=>byQ[q]={});active.forEach(v=>v.alloc.forEach(a=>{if(byQ[a.q])byQ[a.q][v.name]=(byQ[a.q][v.name]||0)+(a.amt||0);}));
-  const pending=[];active.forEach(v=>{let rem=(v.deploy!=null&&v.amount!=null)?v.amount*(v.deploy/100):null;v.alloc.forEach(a=>{if(!a.amt)return;if(rem!=null){if(rem>=a.amt-1){rem-=a.amt;return;}const left=a.amt-Math.max(rem,0);rem=0;if(a.q===CONFIG.NEXT_Q)pending.push({name:v.name,amt:left});}else if(a.q===CONFIG.NEXT_Q)pending.push({name:v.name,amt:a.amt});});});
-  const pendingTot=pending.reduce((a,p)=>a+p.amt,0);const headline=investors.sheetTotal!=null?investors.sheetTotal:totReceived;const totAED=headline*CONFIG.USD_AED;const dep2026=vcCash2026();const depUSD=dep2026!=null?dep2026/CONFIG.USD_AED:null;const fcVC=vcCashForecast();
-  const palette=[cssVar("--brand"),cssVar("--ink"),cssVar("--blue"),cssVar("--target"),cssVar("--teal"),cssVar("--brand-mid"),cssVar("--blue-mid"),cssVar("--grey-bar"),"#B08968"];
+  const qTotal=q=>Object.values(byQ[q]||{}).reduce((s,v)=>s+v,0);
+  const allocTot=tidy(QUARTERS.reduce((s,q)=>s+qTotal(q),0));
+  const committedYear=tidy(QUARTERS.filter(q=>q.endsWith(String(YEAR))).reduce((s,q)=>s+qTotal(q),0));
+  const freeFunds=headline-allocTot;
+  const nextQ=CONFIG.NEXT_Q;const nextQPlan=tidy(qTotal(nextQ));const nextQWho=Object.entries(byQ[nextQ]||{}).filter(([,v])=>v>0).map(([n,v])=>`${n} ${fKraw(v)}`);
+  const deployedPlan=tidy(active.reduce((s,v)=>s+v.alloc.reduce((t,a)=>t+(a.done||0),0),0));
+  const palette=[cssVar("--brand"),cssVar("--ink"),cssVar("--blue"),cssVar("--target"),cssVar("--teal"),cssVar("--brand-mid"),cssVar("--blue-mid"),cssVar("--grey-bar"),"#B08968","#5B8C5A"];
   el.innerHTML=`
   <div class="hrow"><div><h1>VC Investment</h1><div class="psub">Investment Summary · live · USD (AED at ${CONFIG.USD_AED} peg)</div></div></div>
   <div class="grid">
     <div class="col12"><div class="ktiles">
-      ${kpiTile("Total VC raised (received)",money(headline,"$"),`<span class="chip g">${received.length} of ${active.length} active investors</span>`,"",`≈ ${money(totAED)}${dep2026!=null?` · of which ${money(dep2026)} deployed in 2026 (per cashflow)`:""}`)}
-      ${kpiTile("Committed (active)",money(totCommit,"$"),cancelled.length?`<span class="chip n">${cancelled.length} cancelled excluded</span>`:"","")}
-      ${kpiTile("Deployed in 2026 (per cashflow)",money(depUSD,"$"),fcVC&&fcVC.tot?`<span class="chip b">+ ${money(fcVC.tot/CONFIG.USD_AED,"$")} forecast ${fcVC.months.join("/")}</span>`:"","",dep2026!=null?`${money(dep2026)} injected Jan–${MONTHS_S[CONFIG.LAST_ACTUAL.cash]}`:"cashflow VC rows not found",'Sum of the VC rows in the Group cashflow for booked 2026 months, converted at the AED peg. 2026 only — part of the raise was deployed in Q4 2025 and sits in opening cash, so no share of the total is shown here.')}
-      ${kpiTile("Pending next quarter · "+CONFIG.NEXT_Q,money(pendingTot,"$"),pending.length?`<span class="chip o">${pending.map(p=>p.name).join(", ")}</span>`:'<span class="chip n">none flagged</span>',"")}
+      ${kpiTile("Total VC raised (received)",money(headline,"$"),`<span class="chip g">${received.length} of ${active.length} active investors</span>`,"",`≈ ${money(totAED)}`)}
+      ${kpiTile("Committed · "+YEAR,money(committedYear,"$"),cancelled.length?`<span class="chip n">${cancelled.length} cancelled excluded</span>`:"","",`all usage allocated to ${YEAR} quarters`,'Sum of every quarterly allocation in the Investment Summary usage column that falls in '+YEAR+'. Allocations to later years are excluded.')}
+      ${kpiTile("Free funds",money(freeFunds,"$"),`<span class="chip ${freeFunds>0?'b':'n'}">unallocated</span>`,"",`raised ${money(headline,"$")} − allocated ${money(allocTot,"$")}`,'Allocated funds: total raised minus everything allocated to a quarter in the usage column, any year. What is still free to plan.')}
+      ${kpiTile("Planned · "+nextQ,money(nextQPlan,"$"),nextQWho.length?`<span class="chip o">${nextQWho.join(" · ")}</span>`:'<span class="chip n">nothing planned</span>',"","",'Everything the usage column allocates to '+nextQ+', deployed or not.')}
     </div></div>
-    <div class="card p0 col7"><div class="chd"><div class="eyebrow">Deployment plan</div><div class="ctitle">Capital allocated by quarter, stacked by investor</div><div class="csub">${CONFIG.NEXT_Q} highlighted as next quarter.</div></div><div class="chartbox"><canvas id="ch-vcq"></canvas></div></div>
+    <div class="card p0 col7"><div class="chd"><div class="eyebrow">Deployment plan</div><div class="ctitle">Capital allocated by quarter, stacked by investor</div><div class="csub">${nextQ} highlighted as current quarter.</div></div><div class="chartbox"><canvas id="ch-vcq"></canvas></div></div>
     <div class="card p0 col5"><div class="chd"><div class="eyebrow">Who invested</div><div class="ctitle">Ticket sizes</div></div><div class="chartbox"><canvas id="ch-vcw"></canvas></div></div>
-    <div class="card p0 col12"><div class="chd"><div class="eyebrow">Register</div><div class="ctitle">Investor by investor · quarterly allocation</div><div class="csub">Allocation by quarter. Green = deployed, orange = partly deployed, blue = allocated, dashed = next quarter.</div></div>
+    <div class="card p0 col12"><div class="chd"><div class="eyebrow">Register</div><div class="ctitle">Investor by investor · quarterly allocation</div><div class="csub">Green = deployed · orange = partly deployed (deployed / planned) · dashed = planned, not yet deployed.</div></div>
       <div class="twrap"><table id="tbl-vc"></table></div></div>
   </div>`;
   const names=[...active].sort((a,b)=>(b.amount||0)-(a.amount||0)).map(v=>v.name);
   mkChart("ch-vcq",{type:"bar",data:{labels:QUARTERS,datasets:names.map((n,i)=>({label:n,data:QUARTERS.map(q=>byQ[q][n]||null),backgroundColor:palette[i%palette.length],stack:"q",borderRadius:3}))},
-    options:baseOpts({plugins:{tooltip:deepMerge(tip(v=>"$"+Math.round(v).toLocaleString()),{filter:item=>item.parsed.y!=null&&item.parsed.y>0,callbacks:{footer:items=>"Quarter total: $"+Math.round(items.reduce((s,i)=>s+(i.parsed.y||0),0)).toLocaleString()}})},scales:{x:{stacked:true,ticks:{color:QUARTERS.map(q=>q===CONFIG.NEXT_Q?cssVar("--brand"):cssVar("--muted"))}},y:{stacked:true,ticks:{callback:v=>"$"+fKraw(v)}}}})});
+    options:baseOpts({plugins:{tooltip:deepMerge(tip(v=>"$"+Math.round(v).toLocaleString()),{filter:item=>item.parsed.y!=null&&item.parsed.y>0,callbacks:{footer:items=>"Quarter total: $"+Math.round(items.reduce((s,i)=>s+(i.parsed.y||0),0)).toLocaleString()}})},scales:{x:{stacked:true,ticks:{color:QUARTERS.map(q=>q===nextQ?cssVar("--brand"):cssVar("--muted"))}},y:{stacked:true,ticks:{callback:v=>"$"+fKraw(v)}}}})});
   const sorted=[...active].sort((a,b)=>(b.amount||0)-(a.amount||0));
   mkChart("ch-vcw",{type:"bar",data:{labels:sorted.map(v=>v.name),datasets:[{label:"Ticket",data:sorted.map(v=>v.amount),backgroundColor:sorted.map(v=>v.received?cssVar("--brand"):cssVar("--grey-bar")),borderRadius:5}]},
     options:hOpts({plugins:{legend:{display:false},tooltip:tip(v=>"$"+Math.round(v).toLocaleString())},scales:{x:{ticks:{callback:v=>"$"+fKraw(v)}}}})});
-  document.getElementById("tbl-vc").innerHTML=`<thead><tr><th>Investor</th><th>Amount</th><th style="text-align:left">Status</th><th style="text-align:left"><span class="qhead">${QUARTERS.map(q=>`<span>${q.replace(" 20","'")}</span>`).join("")}</span></th><th>Deployed</th></tr></thead><tbody>`+
+  const qhead=`<span class="qhead" style="grid-template-columns:repeat(${QUARTERS.length},52px)">${QUARTERS.map(q=>`<span${q===nextQ?' style="color:var(--brand)"':''}>${qShort(q)}</span>`).join("")}</span>`;
+  document.getElementById("tbl-vc").innerHTML=`<thead><tr><th>Investor</th><th>Amount</th><th style="text-align:left">Status</th><th style="text-align:left">${qhead}</th><th>Deployed</th></tr></thead><tbody>`+
     investors.map(v=>{const st=v.cancelled?'<span class="chip r">Cancelled</span>':(v.received?'<span class="chip g">Received</span>':`<span class="chip n">${esc(v.status||"—")}</span>`);
       const dp=v.deploy==null?'<span class="chip n">—</span>':(v.deploy>=100?'<span class="chip g">100%</span>':`<span class="chip o">${v.deploy}%</span>`);
-      return`<tr${v.cancelled?' class="muted"':''}><td>${esc(v.name)}</td><td class="tnum">${v.amount!=null?"$"+Math.round(v.amount).toLocaleString():"—"}</td><td style="text-align:left">${st}</td><td style="text-align:left">${v.cancelled?'<span class="chip n">—</span>':qStrip(v)}</td><td>${dp}</td></tr>`;}).join("")+
-    (()=>{const qTot=QUARTERS.map(q=>Object.values(byQ[q]).reduce((s,v)=>s+v,0));const allocTot=tidy(qTot.reduce((s,v)=>s+v,0));
-      const strip=`<span class="qstrip">${qTot.map((v,i)=>`<span class="qcell ${v?'has':''}" style="${v?'background:rgba(255,255,255,.14);color:#fff':'background:rgba(255,255,255,.06)'}" title="${QUARTERS[i]}: $${Math.round(v).toLocaleString()}">${v?fKraw(v):""}</span>`).join("")}</span>`;
-      return`<tr class="band"><td>Total (active) · ${active.length} investors</td><td class="tnum">$${Math.round(totCommit).toLocaleString()}</td><td style="text-align:left"><span class="chip g">$${Math.round(totReceived).toLocaleString()} received</span></td><td style="text-align:left">${strip}<div style="font-size:.7rem;font-weight:600;margin-top:4px">${QUARTERS.map((q,i)=>q.replace(" 20","'")+" "+fKraw(qTot[i])).join(" · ")}</div><div style="font-size:.66rem;font-weight:500;opacity:.8;margin-top:2px">allocated $${Math.round(allocTot).toLocaleString()} · pending ${CONFIG.NEXT_Q} $${Math.round(pendingTot).toLocaleString()}</div></td><td><span class="chip g">$${Math.round(depUSD!=null?depUSD:deployed).toLocaleString()} in 2026</span></td></tr></tbody>`;})();
-  mountInsights(el,insightsVC(active,received,depUSD!=null?depUSD:deployed,depUSD!=null?headline:knownDeploy,pending,pendingTot));}
+      return`<tr${v.cancelled?' class="muted"':''}><td>${esc(v.name)}</td><td class="tnum">${v.amount!=null?"$"+Math.round(v.amount).toLocaleString():"—"}</td><td style="text-align:left">${st}</td><td style="text-align:left">${v.cancelled?'<span class="chip n">—</span>':qStrip(v,QUARTERS)}</td><td>${dp}</td></tr>`;}).join("")+
+    (()=>{const qTot=QUARTERS.map(qTotal);
+      const strip=`<span class="qstrip" style="grid-template-columns:repeat(${QUARTERS.length},52px)">${qTot.map((v,i)=>`<span class="qcell ${v?'has':''}" style="${v?'background:rgba(255,255,255,.14);color:#fff':'background:rgba(255,255,255,.06)'}" title="${QUARTERS[i]}: $${Math.round(v).toLocaleString()}">${v?fKraw(v):""}</span>`).join("")}</span>`;
+      return`<tr class="band"><td>Total (active) · ${active.length} investors</td><td class="tnum">$${Math.round(headline).toLocaleString()}</td><td style="text-align:left"><span class="chip g">$${Math.round(totReceived).toLocaleString()} received</span></td><td style="text-align:left">${strip}<div style="font-size:.7rem;font-weight:600;margin-top:4px">${QUARTERS.map((q,i)=>qShort(q)+" "+fKraw(qTot[i])).join(" · ")}</div><div style="font-size:.66rem;font-weight:500;opacity:.8;margin-top:2px">allocated $${Math.round(allocTot).toLocaleString()} · free $${Math.round(freeFunds).toLocaleString()}</div></td><td><span class="chip g">$${Math.round(deployedPlan).toLocaleString()} deployed</span></td></tr></tbody>`;})();
+  mountInsights(el,insightsVC(active,received,headline,committedYear,allocTot,freeFunds,nextQ,nextQPlan,deployedPlan));}
 
 /* ================================================================
    PAGE: FUNDING SCENARIOS
@@ -1036,9 +1057,10 @@ function insightsVariance(rows,ent,scen,isCash){const out=[];const live=rows.fil
 function insightsHybrid(rowsNF,rowsAC,cumPos){const out=[];if(cumPos!=null)out.push(ins("neutral",`Moontech is ${(cumPos*100).toFixed(0)}% of the way to acceleration spending`,cumPos<0.25?"Behaving like the no-funding plan so far.":cumPos<0.75?"Mid-ramp — deploying funds while keeping cover.":"Spending near the acceleration plan."));
   const c=rowsNF.find(r=>r.m.k==="closing"),ca=rowsAC.find(r=>r.m.k==="closing");if(c&&c.varY!=null&&ca)out.push(ins(c.varY>=0?"good":"bad",`Cash ${c.varY>=0?"ahead of":"behind"} no-funding by ${fK(Math.abs(c.varY))}`,`and ${ca.varY>=0?"ahead of":"behind"} acceleration by ${fK(Math.abs(ca.varY||0))}. ${c.varY>=0&&(ca.varY||0)>=0?"Holding more cash than either plan expected — the ramp is funded.":c.varY<0?"Below even the floor plan — cover is the constraint.":"Between the plans, as a hybrid should be."}`));
   const i=rowsNF.find(r=>r.m.k==="inflow");if(i&&i.varY!=null)out.push(ins(i.varY>=0?"good":"bad",`Inflows ${i.varY>=0?"+":"−"}${fK(Math.abs(i.varY))} vs no-funding`,"Collections and funding received against the floor plan."));return out;}
-function insightsVC(active,received,deployed,knownDeploy,pending,pendingTot){const out=[];const rec=tidy(received.reduce((s,v)=>s+(v.amount||0),0)),com=tidy(active.reduce((s,v)=>s+(v.amount||0),0));
-  out.push(ins(rec>=com?"good":"neutral",`$${Math.round(rec).toLocaleString()} of $${Math.round(com).toLocaleString()} committed has landed`,rec>=com?"Every active ticket is in the bank.":`${active.length-received.length} ticket(s) still outstanding.`));
-  out.push(ins("neutral",`$${Math.round(deployed).toLocaleString()} deployed in 2026, per cashflow`,`$${Math.round(pendingTot).toLocaleString()} scheduled for ${CONFIG.NEXT_Q}${pending.length?" ("+pending.map(p=>p.name).join(", ")+")":""}. Earlier deployment (Q4 2025) sits in opening cash and is not counted here.`));
+function insightsVC(active,received,headline,committedYear,allocTot,freeFunds,nextQ,nextQPlan,deployedPlan){const out=[];const rec=tidy(received.reduce((s,v)=>s+(v.amount||0),0));
+  out.push(ins(rec>=headline?"good":"neutral",`$${Math.round(rec).toLocaleString()} of $${Math.round(headline).toLocaleString()} raised has landed`,rec>=headline?"Every active ticket is in the bank.":`${active.length-received.length} ticket(s) still outstanding.`));
+  out.push(ins("neutral",`$${Math.round(deployedPlan).toLocaleString()} deployed against the usage plan`,`$${Math.round(committedYear).toLocaleString()} committed to 2026 quarters; $${Math.round(nextQPlan).toLocaleString()} planned for ${nextQ}.`));
+  out.push(ins(freeFunds>0?"good":"neutral",`$${Math.round(freeFunds).toLocaleString()} free funds`,freeFunds>0?`Raised but not yet allocated to any quarter in the usage plan.`:`The whole raise is allocated ($${Math.round(allocTot).toLocaleString()}).`));
   return out;}
 function insightsScenarios(g,m,c,vcAED,vc2026,loan2026){const out=[];const co=arr=>arr?cashOutMonth(arr):null;
   out.push(ins(co(g.noBoth)==null?"good":"bad",`Without VC and loans, Group ${co(g.noBoth)==null?"stays positive":"runs out of cash in "+MONTHS[co(g.noBoth)]}`,`Year-end ${fK(g.noBoth[11])} vs ${fK(g.baseline[11])} on the live path. Deployed in 2026: ${fK(vc2026)} VC, ${fK(loan2026)} loans.`));
